@@ -1,7 +1,9 @@
 package overlay
 
 import (
+	"fmt"
 	"github.com/dist-ribut-us/crypto"
+	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/packeter"
 	"github.com/dist-ribut-us/rnet"
 	"sync"
@@ -13,15 +15,23 @@ type Server struct {
 	priv        *crypto.Priv
 	id          *crypto.ID
 	packeter    *packeter.Packeter
+	ipc         *ipc.Proc
 	nById       map[string]*Node
 	nByAddr     map[string]*Node
 	mtxNodes    sync.RWMutex
 	loss        float64
 	reliability float64
+	addr        *rnet.Addr
 }
 
-func NewServer(port string) (*Server, error) {
+func NewServer(proc *ipc.Proc, ip string) (*Server, error) {
 	pub, priv, err := crypto.GenerateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(fmt.Sprintf("%s:%d", ip, proc.Port()))
+	addr, err := rnet.ResolveAddr(fmt.Sprintf("%s:%d", ip, proc.Port()))
 	if err != nil {
 		return nil, err
 	}
@@ -31,13 +41,16 @@ func NewServer(port string) (*Server, error) {
 		priv:        priv,
 		id:          pub.GetID(),
 		packeter:    packeter.New(),
+		ipc:         proc,
 		nById:       make(map[string]*Node),
 		nByAddr:     make(map[string]*Node),
 		loss:        0.01,
 		reliability: 0.999,
+		addr:        addr,
 	}
 
-	srv.Server, err = rnet.RunNew(port, srv)
+	srv.Server, err = rnet.RunNew(proc.String(), srv)
+	proc.Run()
 
 	return srv, err
 }
@@ -73,3 +86,5 @@ func (s *Server) PubStr() string {
 	}
 	return s.pub.String()
 }
+
+func (s *Server) IPCChan() <-chan *ipc.Message { return s.ipc.Chan() }

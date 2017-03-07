@@ -8,7 +8,7 @@ import (
 )
 
 func buildHandshake(pub *crypto.Pub, shared *crypto.Shared) []byte {
-	box := shared.Seal(pub.Slice())
+	box := shared.Seal(pub.Slice(), nil)
 	hs := make([]byte, 1+crypto.KeyLength+len(box))
 	hs[0] = Handshake
 	copy(hs[1:], pub.Slice())
@@ -20,10 +20,7 @@ func validateHandshake(hs []byte, priv *crypto.Priv) (*crypto.Pub, *crypto.Share
 	if len(hs) < 1+crypto.KeyLength {
 		return nil, nil, false
 	}
-	pub, err := crypto.PubFromSlice(hs[:crypto.KeyLength])
-	if err != nil {
-		return nil, nil, false
-	}
+	pub := crypto.PubFromSlice(hs[:crypto.KeyLength])
 	shared := pub.Precompute(priv)
 	box, err := shared.Open(hs[crypto.KeyLength:])
 	if err != nil || !bytes.Equal(hs[:crypto.KeyLength], box) {

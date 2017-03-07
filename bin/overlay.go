@@ -2,11 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/dist-ribut-us/crypto"
-	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/overlay"
-	"github.com/dist-ribut-us/rnet"
+	"github.com/dist-ribut-us/prog"
 )
 
 const (
@@ -15,34 +13,25 @@ const (
 )
 
 func main() {
-	port := fmt.Sprintf(":%d", rnet.RandomPort())
-	overlayNode, err := overlay.NewServer(port)
-	if err != nil {
-		panic(err)
-	}
+	proc, _, _, err := prog.ReadArgs()
+	check(err)
 
-	err = igdp.Setup()
-	if err != nil {
-		panic(err)
-	}
-
-	err = igdp.AddPortMapping(overlayNode.Port(), overlayNode.Port())
-	if err != nil {
-		fmt.Println(err)
+	if err := igdp.Setup(); err == nil {
+		_, err = igdp.AddPortMapping(proc.Port(), proc.Port())
+		check(err)
 	}
 	ip, err := igdp.GetExternalIP()
-	if err != nil {
-		panic(err)
-	}
+	check(err)
 
-	ipcSrv, err := ipc.RunNew(0)
+	overlayNode, err := overlay.NewServer(proc, ip)
+	check(err)
 
-	fmt.Printf("IPC> 127.0.0.1:%d\n", ipcSrv.Port())
+	fmt.Printf("IPC> 127.0.0.1:%d\n", proc.Port())
 	fmt.Printf("NET> %s:%d\n", ip, overlayNode.Port())
 	fmt.Println(overlayNode.PubStr())
 
 	onCh := overlayNode.Chan()
-	ipcCh := ipcSrv.Chan()
+	ipcCh := overlayNode.IPCChan()
 	for {
 		select {
 		case msg := <-onCh:
@@ -50,5 +39,11 @@ func main() {
 		case msg := <-ipcCh:
 			fmt.Println("IPC: ", string(msg.Body))
 		}
+	}
+}
+
+func check(err error) {
+	if err != nil {
+		panic(err)
 	}
 }

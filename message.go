@@ -26,7 +26,7 @@ func (s *Server) Send(msg []byte, node *Node) {
 	shared := node.Shared(s.priv)
 
 	for i, pkt := range pkts {
-		pkts[i] = append([]byte{Message}, shared.Seal(pkt)...)
+		pkts[i] = append([]byte{Message}, shared.Seal(pkt, nil)...)
 	}
 
 	s.Server.SendAll(pkts, node.ToAddr)
