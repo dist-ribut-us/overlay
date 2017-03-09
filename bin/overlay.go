@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/overlay"
 	"github.com/dist-ribut-us/prog"
@@ -13,37 +14,36 @@ const (
 )
 
 func main() {
+	log.Panic(log.ToFile())
+	log.Go()
+	log.SetDebug(true)
+	log.Contents = log.Truncate
+
 	proc, _, _, err := prog.ReadArgs()
-	check(err)
+	log.Panic(err)
 
 	if err := igdp.Setup(); err == nil {
 		_, err = igdp.AddPortMapping(proc.Port(), proc.Port())
-		check(err)
+		log.Panic(err)
 	}
 	ip, err := igdp.GetExternalIP()
-	check(err)
+	log.Panic(err)
 
+	log.Info("starting_server")
 	overlayNode, err := overlay.NewServer(proc, ip)
-	check(err)
+	log.Panic(err)
+	log.Info("server_started")
 
-	fmt.Printf("IPC> 127.0.0.1:%d\n", proc.Port())
-	fmt.Printf("NET> %s:%d\n", ip, overlayNode.Port())
-	fmt.Println(overlayNode.PubStr())
+	log.Info(fmt.Sprintf("IPC> 127.0.0.1:%d NET> %s:%d %s", proc.Port(), ip, overlayNode.Port(), overlayNode.PubStr()))
 
 	onCh := overlayNode.Chan()
 	ipcCh := overlayNode.IPCChan()
 	for {
 		select {
 		case msg := <-onCh:
-			fmt.Println("NET: ", string(msg.Body))
+			log.Info("NET: ", string(msg.Body))
 		case msg := <-ipcCh:
-			fmt.Println("IPC: ", string(msg.Body))
+			log.Info("IPC: ", string(msg.Body))
 		}
-	}
-}
-
-func check(err error) {
-	if err != nil {
-		panic(err)
 	}
 }

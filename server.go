@@ -1,7 +1,6 @@
 package overlay
 
 import (
-	"fmt"
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/packeter"
@@ -25,13 +24,10 @@ type Server struct {
 }
 
 func NewServer(proc *ipc.Proc, ip string) (*Server, error) {
-	pub, priv, err := crypto.GenerateKey()
-	if err != nil {
-		return nil, err
-	}
+	pub, priv := crypto.GenerateKey()
 
-	fmt.Println(fmt.Sprintf("%s:%d", ip, proc.Port()))
-	addr, err := rnet.ResolveAddr(fmt.Sprintf("%s:%d", ip, proc.Port()))
+	port := rnet.RandomPort()
+	addr, err := port.On(ip)
 	if err != nil {
 		return nil, err
 	}
@@ -49,8 +45,8 @@ func NewServer(proc *ipc.Proc, ip string) (*Server, error) {
 		addr:        addr,
 	}
 
-	srv.Server, err = rnet.RunNew(proc.String(), srv)
-	proc.Run()
+	srv.Server, err = rnet.RunNew(port.String(), srv)
+	go proc.Run()
 
 	return srv, err
 }
