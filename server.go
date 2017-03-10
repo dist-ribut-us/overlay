@@ -23,13 +23,16 @@ type Server struct {
 	addr        *rnet.Addr
 }
 
+// NewServer creates an Overlay Server. The server starts off running. An
+// overlay server can route messages from the network to local programs and send
+// messages from local programs to the network.
 func NewServer(proc *ipc.Proc, ip string) (*Server, error) {
 	pub, priv := crypto.GenerateKey()
 
 	port := rnet.RandomPort()
-	addr, err := port.On(ip)
-	if err != nil {
-		return nil, err
+	addr := port.On(ip)
+	if addr.Err != nil {
+		return nil, addr.Err
 	}
 
 	srv := &Server{
@@ -45,7 +48,8 @@ func NewServer(proc *ipc.Proc, ip string) (*Server, error) {
 		addr:        addr,
 	}
 
-	srv.Server, err = rnet.RunNew(port.String(), srv)
+	var err error
+	srv.Server, err = rnet.RunNew(port, srv)
 	go proc.Run()
 
 	return srv, err

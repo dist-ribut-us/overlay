@@ -2,7 +2,6 @@ package overlay
 
 import (
 	"bytes"
-	"fmt"
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/rnet"
 )
@@ -34,8 +33,6 @@ func (s *Server) handshake(hs []byte, addr *rnet.Addr) {
 	if !ok {
 		return
 	}
-
-	fmt.Println("Added Node")
 
 	s.AddNode(&Node{
 		Pub:      pub,

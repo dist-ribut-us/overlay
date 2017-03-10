@@ -7,10 +7,8 @@ import (
 )
 
 func TestHandshakeFormat(t *testing.T) {
-	senderPub, senderPriv, err := crypto.GenerateKey()
-	assert.NoError(t, err)
-	receiverPub, receiverPriv, err := crypto.GenerateKey()
-	assert.NoError(t, err)
+	senderPub, senderPriv := crypto.GenerateKey()
+	receiverPub, receiverPriv := crypto.GenerateKey()
 
 	shared := receiverPub.Precompute(senderPriv)
 	hs := buildHandshake(senderPub, shared)

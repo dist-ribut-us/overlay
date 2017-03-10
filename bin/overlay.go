@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/overlay"
@@ -29,12 +28,10 @@ func main() {
 	ip, err := igdp.GetExternalIP()
 	log.Panic(err)
 
-	log.Info("starting_server")
 	overlayNode, err := overlay.NewServer(proc, ip)
 	log.Panic(err)
-	log.Info("server_started")
 
-	log.Info(fmt.Sprintf("IPC> 127.0.0.1:%d NET> %s:%d %s", proc.Port(), ip, overlayNode.Port(), overlayNode.PubStr()))
+	log.Info(log.Lbl("IPC>"), proc.Port().On("127.0.0.1"), log.Lbl("Net>"), overlayNode.Port().On(ip), overlayNode.PubStr())
 
 	onCh := overlayNode.Chan()
 	ipcCh := overlayNode.IPCChan()
