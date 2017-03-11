@@ -26,8 +26,8 @@ func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
 	s.packeter.Receive(pPkt, addr)
 }
 
-// Send a message over the network
-func (s *Server) Send(msg []byte, node *Node) {
+// NetSend sends a message over the network
+func (s *Server) NetSend(msg []byte, node *Node) {
 	msg = compress(msg)
 	pkts, err := s.packeter.Make(msg, s.loss, s.reliability)
 	if log.Error(errors.Wrap("while sending message", err)) {

@@ -51,7 +51,7 @@ func TestServer(t *testing.T) {
 	if s1Node, ok := s2.NodeByID(s1.pub.GetID()); assert.True(t, ok) {
 		msg := make([]byte, 1000)
 		rand.Read(msg) // random data will not use compression
-		s2.Send(msg, s1Node)
+		s2.NetSend(msg, s1Node)
 
 		select {
 		case msgOut := <-s1.netChan:
@@ -61,7 +61,7 @@ func TestServer(t *testing.T) {
 			t.Error("Timed out")
 		}
 
-		s2.Send([]byte(loremIpsum), s1Node) // loremIpusm will use compression
+		s2.NetSend([]byte(loremIpsum), s1Node) // loremIpusm will use compression
 		select {
 		case msgOut := <-s1.netChan:
 			assert.NoError(t, msgOut.Err)
