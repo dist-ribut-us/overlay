@@ -3,13 +3,14 @@ package overlay
 import (
 	"bytes"
 	"github.com/dist-ribut-us/crypto"
+	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/rnet"
 )
 
 func buildHandshake(pub *crypto.Pub, shared *crypto.Shared) []byte {
 	box := shared.Seal(pub.Slice(), nil)
 	hs := make([]byte, 1+crypto.KeyLength+len(box))
-	hs[0] = Handshake
+	hs[0] = handshake
 	copy(hs[1:], pub.Slice())
 	copy(hs[1+crypto.KeyLength:], box)
 	return hs
@@ -29,8 +30,9 @@ func validateHandshake(hs []byte, priv *crypto.Priv) (*crypto.Pub, *crypto.Share
 }
 
 func (s *Server) handshake(hs []byte, addr *rnet.Addr) {
-	pub, shared, ok := validateHandshake(hs, s.priv)
+	pub, shared, ok := validateHandshake(hs[1:], s.priv)
 	if !ok {
+		log.Info(log.Lbl("handshake_validation_failed"), addr)
 		return
 	}
 
@@ -38,13 +40,14 @@ func (s *Server) handshake(hs []byte, addr *rnet.Addr) {
 		Pub:      pub,
 		shared:   shared,
 		FromAddr: addr,
+		ToAddr:   addr, // This may not be right, but it's a good guess
 	})
 }
 
 // Handshake sends a handshake packet to the specified node. The handshake
 // packet will send the public key and sign it with a shared key. The receiver
 // will also see what address the message came from.
-func (s *Server) Handshake(node *Node) {
+func (s *Server) Handshake(node *Node) error {
 	hs := buildHandshake(s.pub, node.Shared(s.priv))
-	s.Server.Send(hs, node.ToAddr)
+	return s.net.Send(hs, node.ToAddr)
 }

@@ -31,13 +31,13 @@ func main() {
 	overlayNode, err := overlay.NewServer(proc, ip)
 	log.Panic(err)
 
-	log.Info(log.Lbl("IPC>"), proc.Port().On("127.0.0.1"), log.Lbl("Net>"), overlayNode.Port().On(ip), overlayNode.PubStr())
+	log.Info(log.Lbl("IPC>"), proc.Port().On("127.0.0.1"), log.Lbl("Net>"), overlayNode.NetPort().On(ip), overlayNode.PubStr())
 
-	onCh := overlayNode.Chan()
+	netCh := overlayNode.NetChan()
 	ipcCh := overlayNode.IPCChan()
 	for {
 		select {
-		case msg := <-onCh:
+		case msg := <-netCh:
 			log.Info("NET: ", string(msg.Body))
 		case msg := <-ipcCh:
 			log.Info("IPC: ", string(msg.Body))

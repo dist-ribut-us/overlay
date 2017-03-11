@@ -12,7 +12,7 @@ func TestHandshakeFormat(t *testing.T) {
 
 	shared := receiverPub.Precompute(senderPriv)
 	hs := buildHandshake(senderPub, shared)
-	assert.Equal(t, hs[0], Handshake)
+	assert.Equal(t, hs[0], handshake)
 
 	pub, sharedOut, ok := validateHandshake(hs[1:], receiverPriv)
 	assert.True(t, ok)
