@@ -6,6 +6,7 @@ import (
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/overlay"
 	"github.com/dist-ribut-us/prog"
+	"github.com/dist-ribut-us/serial"
 )
 
 const (
@@ -39,10 +40,9 @@ func main() {
 		Type: "port",
 		Body: []byte("Overlay"),
 	}
-	msg, err := q.Wrap()
-	if !log.Error(err) {
-		overlayNode.IPCSend(msg, pool)
-	}
+	overlayNode.SendQuery(q, pool, func(r *ipc.Wrapper) {
+		log.Info(log.Lbl("got_response_to_port_request"), serial.UnmarshalUint16(r.Response.Body))
+	})
 
 	netCh := overlayNode.NetChan()
 	ipcCh := overlayNode.IPCChan()
