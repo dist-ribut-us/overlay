@@ -14,7 +14,7 @@ const (
 
 func main() {
 	log.Contents = log.Truncate
-	log.Panic(log.ToFile())
+	log.Panic(log.ToFile(prog.Root() + "overlay.log"))
 	log.Go()
 	log.SetDebug(true)
 
