@@ -11,21 +11,30 @@ func (s *Server) IPCSend(msg []byte, port rnet.Port) {
 	s.ipc.Send(msg, port)
 }
 
-// SendQuery sends a query to another process and registers a callback to handle
-// the response
-func (s *Server) SendQuery(q *ipc.Query, port rnet.Port, callback func(r *ipc.Wrapper)) {
-	s.ipc.SendQuery(q, port, callback)
+// Query wraps the ipc.Proc query method
+func (s *Server) Query(t uint32, body []byte) *ipc.Base {
+	return s.ipc.Query(t, body)
 }
 
 // HandleMessage responds to a message received over ipc
 func (s *Server) HandleMessage(msg *ipc.Message) {
 	log.Info("msg_on_overlay_ipc")
-	w, err := msg.Unwrap()
+	b, err := msg.ToBase()
 	if log.Error(err) {
 		return
 	}
-	switch w.Type {
+	if b.IsQuery() {
+		s.handleQuery(b)
+	} else {
+		log.Info(log.Lbl("overlay_unknown_type"), b.Type)
+	}
+}
+
+func (s *Server) handleQuery(q *ipc.Base) {
+	switch q.Type {
+	case ipc.TPing:
+		q.Respond([]byte{q.Body[0] + 1})
 	default:
-		log.Info(log.Lbl("overlay_unknown_type"), w.Type)
+		log.Info(log.Lbl("unknown_query_type"), q.Type)
 	}
 }

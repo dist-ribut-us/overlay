@@ -1,12 +1,10 @@
 package main
 
 import (
-	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/overlay"
 	"github.com/dist-ribut-us/prog"
-	"github.com/dist-ribut-us/serial"
 )
 
 const (
@@ -15,12 +13,12 @@ const (
 )
 
 func main() {
+	log.Contents = log.Truncate
 	log.Panic(log.ToFile())
 	log.Go()
 	log.SetDebug(true)
-	log.Contents = log.Truncate
 
-	proc, pool, _, err := prog.ReadArgs()
+	proc, _, _, err := prog.ReadArgs()
 	log.Panic(err)
 
 	if err := igdp.Setup(); err == nil {
@@ -35,14 +33,6 @@ func main() {
 	log.Panic(err)
 
 	log.Info(log.Lbl("IPC>"), proc.Port().On("127.0.0.1"), log.Lbl("Net>"), overlayNode.NetPort().On(ip), overlayNode.PubStr())
-
-	q := &ipc.Query{
-		Type: "port",
-		Body: []byte("Overlay"),
-	}
-	overlayNode.SendQuery(q, pool, func(r *ipc.Wrapper) {
-		log.Info(log.Lbl("got_response_to_port_request"), serial.UnmarshalUint16(r.Response.Body))
-	})
 
 	netCh := overlayNode.NetChan()
 	ipcCh := overlayNode.IPCChan()
