@@ -3,6 +3,8 @@ package overlay
 import (
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/log"
+	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/packeter"
 	"github.com/dist-ribut-us/rnet"
 	"sync"
@@ -23,19 +25,14 @@ type Server struct {
 	reliability float64
 	addr        *rnet.Addr
 	netChan     chan *packeter.Message
+	services    map[uint32]rnet.Port
 }
 
 // NewServer creates an Overlay Server. The server starts off running. An
 // overlay server can route messages from the network to local programs and send
 // messages from local programs to the network.
-func NewServer(proc *ipc.Proc, ip string) (*Server, error) {
+func NewServer(proc *ipc.Proc) (*Server, error) {
 	pub, priv := crypto.GenerateKey()
-
-	port := rnet.RandomPort()
-	addr := port.On(ip)
-	if addr.Err != nil {
-		return nil, addr.Err
-	}
 
 	srv := &Server{
 		pub:         pub,
@@ -47,15 +44,31 @@ func NewServer(proc *ipc.Proc, ip string) (*Server, error) {
 		nByAddr:     make(map[string]*Node),
 		loss:        0.01,
 		reliability: 0.999,
-		addr:        addr,
 		netChan:     make(chan *packeter.Message, packeter.BufferSize),
+		services:    make(map[uint32]rnet.Port),
 	}
 
 	var err error
-	srv.net, err = rnet.RunNew(port, srv)
+	srv.net, err = rnet.RunNew(rnet.RandomPort(), srv)
 	go proc.Run()
 	go srv.unzip()
 	return srv, err
+}
+
+// SetupNetwork tries to connect to the network.
+func (s *Server) SetupNetwork() {
+	if err := igdp.Setup(); err == nil {
+		_, err = igdp.AddPortMapping(s.net.Port(), s.net.Port())
+		log.Error(err)
+	}
+	ip, err := igdp.GetExternalIP()
+	log.Error(err)
+
+	addr := s.net.Port().On(ip)
+	log.Error(addr.Err)
+	s.addr = addr
+
+	log.Info(log.Lbl("IPC>"), s.ipc.Port().On("127.0.0.1"), log.Lbl("Net>"), addr, s.PubStr())
 }
 
 // NodeByAddr gets a node using an address
@@ -105,3 +118,17 @@ func (s *Server) NetPort() rnet.Port { return s.net.Port() }
 
 // IPCPort gets the port used to communicate with other processes
 func (s *Server) IPCPort() rnet.Port { return s.ipc.Port() }
+
+// Run the overlay server listening on both ipc and network channels
+func (s *Server) Run() {
+	ipcCh := s.ipc.Chan()
+	log.Info("overlay_listening")
+	for {
+		select {
+		case msg := <-s.netChan:
+			log.Info("NET: ", string(msg.Body))
+		case msg := <-ipcCh:
+			go s.HandleMessage(msg)
+		}
+	}
+}

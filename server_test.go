@@ -8,35 +8,44 @@ import (
 	"time"
 )
 
-const loremIpsum = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam eu
-interdum nibh, vel malesuada nunc. Morbi sit amet augue finibus magna interdum
-dictum. Donec tincidunt consectetur hendrerit. Praesent hendrerit mauris vel
-erat accumsan, eu posuere augue interdum. Sed semper ut magna nec molestie.
-Nullam accumsan metus vel arcu sodales rutrum. Duis nec malesuada ex, nec tempor
-ante. Praesent pellentesque maximus turpis quis vulputate. Cras quis tincidunt
-leo, in dapibus urna. Donec consectetur, erat nec eleifend accumsan, risus mi
-egestas est, quis facilisis augue lacus a metus. Aliquam tincidunt sit amet dui
-pellentesque suscipit. Aenean quis enim purus. Aliquam orci augue, blandit eu
-convallis nec, laoreet vitae sapien. Donec metus tellus, placerat at tempor in,
-posuere sit amet enim. Curabitur rhoncus mollis massa, vitae finibus velit
-ultrices sit amet.`
+const loremIpsum = `Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+Nullam eu interdum nibh, vel malesuada nunc. Morbi sit amet augue finibus magna
+interdum dictum. Donec tincidunt consectetur hendrerit. Praesent hendrerit
+mauris vel erat accumsan, eu posuere augue interdum. Sed semper ut magna nec
+molestie. Nullam accumsan metus vel arcu sodales rutrum. Duis nec malesuada ex,
+nec tempor ante. Praesent pellentesque maximus turpis quis vulputate. Cras quis
+tincidunt leo, in dapibus urna. Donec consectetur, erat nec eleifend accumsan,
+risus mi egestas est, quis facilisis augue lacus a metus. Aliquam tincidunt sit
+amet dui pellentesque suscipit. Aenean quis enim purus. Aliquam orci augue,
+blandit eu convallis nec, laoreet vitae sapien. Donec metus tellus, placerat at
+tempor in, posuere sit amet enim. Curabitur rhoncus mollis massa, vitae finibus
+velit ultrices sit amet.`
+
+func (s *Server) setIP(t *testing.T, ip string) {
+	addr := s.net.Port().On(ip)
+	if addr.Err != nil {
+		t.Error(addr.Err)
+	}
+	s.addr = addr
+}
 
 func TestServer(t *testing.T) {
+	ip := "127.0.0.1"
 	proc1, err := ipc.New(2222)
 	assert.NoError(t, err)
-	s1, err := NewServer(proc1, "127.0.0.1")
+	s1, err := NewServer(proc1)
 	assert.NoError(t, err)
+	s1.setIP(t, ip)
 	proc2, err := ipc.New(2223)
 	assert.NoError(t, err)
-	s2, err := NewServer(proc2, "127.0.0.1")
+	s2, err := NewServer(proc2)
 	assert.NoError(t, err)
+	s2.setIP(t, ip)
 
-	s2Addr := s2.net.Port().On("127.0.0.1")
-	assert.NoError(t, s2Addr.Err)
 	s2Node := &Node{
 		Pub:      s2.pub,
-		FromAddr: s2Addr,
-		ToAddr:   s2Addr,
+		FromAddr: s2.addr,
+		ToAddr:   s2.addr,
 	}
 	s1.AddNode(s2Node)
 	s1.Handshake(s2Node)
