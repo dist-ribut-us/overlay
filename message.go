@@ -33,7 +33,7 @@ func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
 	s.packeter.Receive(pPkt, addr)
 }
 
-func (s *Server) handleNetMessage(msg *packeter.Message) {
+func (s *Server) handleNetMessage(msg *packeter.Package) {
 	if log.Error(msg.Err) {
 		return
 	} else if len(msg.Body) == 0 {
@@ -57,7 +57,7 @@ func (s *Server) handleNetMessage(msg *packeter.Message) {
 // decrypted.
 const ErrUnknonNode = errors.String("Unknown node by address")
 
-func (s *Server) unmarshalNetMessage(msg *packeter.Message) (*message.Header, error) {
+func (s *Server) unmarshalNetMessage(msg *packeter.Package) (*message.Header, error) {
 	if msg.Body[0] == GZipped {
 		b, err := decompress(msg.Body[1:])
 		if err != nil {
