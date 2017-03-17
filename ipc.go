@@ -19,7 +19,7 @@ func (s *Server) Query(t message.Type, body interface{}) *ipc.Base {
 }
 
 // handleIPCMessage responds to a message received over ipc
-func (s *Server) handleIPCMessage(msg *ipc.Message) {
+func (s *Server) handleIPCMessage(msg *ipc.Package) {
 	log.Info("msg_on_overlay_ipc")
 	b, err := msg.ToBase()
 	if log.Error(err) {
