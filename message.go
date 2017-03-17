@@ -52,6 +52,11 @@ func (s *Server) handleNetMessage(msg *packeter.Message) {
 	s.IPCSend(msg.Body, servicePort)
 }
 
+// ErrUnknonNode will occure if a message is received from an unknown address.
+// This shouldn't happen because the packets need to know the node to be
+// decrypted.
+const ErrUnknonNode = errors.String("Unknown node by address")
+
 func (s *Server) unmarshalNetMessage(msg *packeter.Message) (*message.Header, error) {
 	if msg.Body[0] == GZipped {
 		b, err := decompress(msg.Body[1:])
@@ -70,7 +75,11 @@ func (s *Server) unmarshalNetMessage(msg *packeter.Message) (*message.Header, er
 		return nil, err
 	}
 	h.SetType(message.NetReceive)
-	h.SetAddr(msg.Addr)
+	node, ok := s.NodeByAddr(msg.Addr)
+	if !ok {
+		return nil, ErrUnknonNode
+	}
+	h.NodeID = node.GetID()[:]
 	h.Id = msg.ID
 
 	return h, nil

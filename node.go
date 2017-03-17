@@ -8,6 +8,7 @@ import (
 // Node represents a peer on the network running Overlay.
 type Node struct {
 	Pub      *crypto.Pub
+	ID       *crypto.ID
 	shared   *crypto.Shared
 	ToAddr   *rnet.Addr
 	FromAddr *rnet.Addr
@@ -19,4 +20,12 @@ func (n *Node) Shared(priv *crypto.Priv) *crypto.Shared {
 		n.shared = n.Pub.Precompute(priv)
 	}
 	return n.shared
+}
+
+// GetID returns the ID for the public key
+func (n *Node) GetID() *crypto.ID {
+	if n.ID == nil {
+		n.ID = n.Pub.GetID()
+	}
+	return n.ID
 }
