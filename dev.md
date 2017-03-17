@@ -1,5 +1,4 @@
 ## Dev Notes
 
-I've added compression, but for some data (and particularly for some large media
-formats) it won't be useful. There should be a way to send a message and request
-that compression attempts are skipped.
+Node shared doesn't make sense. It should either be associated with a Server
+and not take a priv or it should not cache the result.

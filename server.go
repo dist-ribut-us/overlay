@@ -24,7 +24,6 @@ type Server struct {
 	loss        float64
 	reliability float64
 	addr        *rnet.Addr
-	netChan     chan *packeter.Message
 	services    map[uint32]rnet.Port
 }
 
@@ -44,14 +43,12 @@ func NewServer(proc *ipc.Proc) (*Server, error) {
 		nByAddr:     make(map[string]*Node),
 		loss:        0.01,
 		reliability: 0.999,
-		netChan:     make(chan *packeter.Message, packeter.BufferSize),
 		services:    make(map[uint32]rnet.Port),
 	}
 
 	var err error
 	srv.net, err = rnet.RunNew(rnet.RandomPort(), srv)
 	go proc.Run()
-	go srv.unzip()
 	return srv, err
 }
 
@@ -107,12 +104,6 @@ func (s *Server) PubStr() string {
 	return s.pub.String()
 }
 
-// NetChan gets the channel for messages coming from the network
-func (s *Server) NetChan() <-chan *packeter.Message { return s.netChan }
-
-// IPCChan gets the channel for messages coming from other processes
-func (s *Server) IPCChan() <-chan *ipc.Message { return s.ipc.Chan() }
-
 // NetPort gets the network facing port
 func (s *Server) NetPort() rnet.Port { return s.net.Port() }
 
@@ -122,13 +113,14 @@ func (s *Server) IPCPort() rnet.Port { return s.ipc.Port() }
 // Run the overlay server listening on both ipc and network channels
 func (s *Server) Run() {
 	ipcCh := s.ipc.Chan()
+	netCh := s.packeter.Chan()
 	log.Info("overlay_listening")
 	for {
 		select {
-		case msg := <-s.netChan:
-			log.Info("NET: ", string(msg.Body))
+		case msg := <-netCh:
+			go s.handleNetMessage(msg)
 		case msg := <-ipcCh:
-			go s.HandleMessage(msg)
+			go s.handleIPCMessage(msg)
 		}
 	}
 }

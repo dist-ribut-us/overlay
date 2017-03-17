@@ -3,22 +3,23 @@ package overlay
 import (
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
+	"github.com/dist-ribut-us/message"
 	"github.com/dist-ribut-us/rnet"
-	"github.com/dist-ribut-us/serial"
 )
 
-// IPCSend sends a message to a process
+// IPCSend is a raw send call to the ipc
 func (s *Server) IPCSend(msg []byte, port rnet.Port) {
 	s.ipc.Send(msg, port)
 }
 
-// Query wraps the ipc.Proc query method
-func (s *Server) Query(t uint32, body []byte) *ipc.Base {
+// Query takes a type and a body and sends an IPC query. For valid body values
+// see dist-ribut-us/message.SetBody.
+func (s *Server) Query(t message.Type, body interface{}) *ipc.Base {
 	return s.ipc.Query(t, body)
 }
 
-// HandleMessage responds to a message received over ipc
-func (s *Server) HandleMessage(msg *ipc.Message) {
+// handleIPCMessage responds to a message received over ipc
+func (s *Server) handleIPCMessage(msg *ipc.Message) {
 	log.Info("msg_on_overlay_ipc")
 	b, err := msg.ToBase()
 	if log.Error(err) {
@@ -32,21 +33,21 @@ func (s *Server) HandleMessage(msg *ipc.Message) {
 }
 
 func (s *Server) handleQuery(q *ipc.Base) {
-	switch q.Type {
-	case ipc.TPing:
+	switch t := q.GetType(); t {
+	case message.Ping:
 		q.Respond([]byte{q.Body[0] + 1})
 	default:
-		log.Info(log.Lbl("unknown_query_type"), q.Type)
+		log.Info(log.Lbl("unknown_query_type"), t)
 	}
 }
 
 func (s *Server) handleOther(b *ipc.Base) {
-	switch b.Type {
-	case ipc.TRegister:
-		id := serial.UnmarshalUint32(b.Body)
+	switch t := b.GetType(); t {
+	case message.RegisterService:
+		id := b.BodyToUint32()
 		log.Info(log.Lbl("registered_service"), id, b.Port())
 		s.services[id] = b.Port()
 	default:
-		log.Info(log.Lbl("unknown_type"), b.Type)
+		log.Info(log.Lbl("unknown_type"), t)
 	}
 }

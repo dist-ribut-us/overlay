@@ -3,13 +3,20 @@ package overlay
 import (
 	"bytes"
 	"compress/gzip"
+	"github.com/dist-ribut-us/bufpool"
 	"github.com/dist-ribut-us/errors"
 	"github.com/dist-ribut-us/log"
+	"github.com/dist-ribut-us/message"
+	"github.com/dist-ribut-us/packeter"
 	"github.com/dist-ribut-us/rnet"
+	"github.com/golang/protobuf/proto"
+	"sync"
 )
 
+// Compression tags
 const (
-	gzipped = byte(1 << iota)
+	NoCompression = byte(iota)
+	GZipped
 )
 
 func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
@@ -26,43 +33,128 @@ func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
 	s.packeter.Receive(pPkt, addr)
 }
 
-// NetSend sends a message over the network
-func (s *Server) NetSend(msg []byte, node *Node) {
-	msg = compress(msg)
-	pkts, err := s.packeter.Make(msg, s.loss, s.reliability)
-	if log.Error(errors.Wrap("while sending message", err)) {
+func (s *Server) handleNetMessage(msg *packeter.Message) {
+	if log.Error(msg.Err) {
+		return
+	} else if len(msg.Body) == 0 {
+		log.Info(log.Lbl("message_has_no_body"))
+	}
+
+	h, err := s.unmarshalNetMessage(msg)
+	if log.Error(err) {
 		return
 	}
-	shared := node.Shared(s.priv)
-
-	pkts = shared.SealPackets([]byte{message}, pkts, nil)
-
-	s.net.SendAll(pkts, node.ToAddr)
+	servicePort, ok := s.services[h.Service]
+	if !ok {
+		log.Info(log.Lbl("no_service_registered_for"), h.Service)
+		return
+	}
+	s.IPCSend(msg.Body, servicePort)
 }
 
-func compress(msg []byte) []byte {
-	b := bytes.NewBuffer([]byte{gzipped})
-	w := gzip.NewWriter(b)
-	_, err := w.Write(msg)
+func (s *Server) unmarshalNetMessage(msg *packeter.Message) (*message.Header, error) {
+	if msg.Body[0] == GZipped {
+		b, err := decompress(msg.Body[1:])
+		if err != nil {
+			return nil, err
+		}
+		msg.Body = append(msg.Body[0:0], b.Bytes()...)
+		bufpool.Put(b)
+	} else {
+		msg.Body = msg.Body[1:]
+	}
+
+	h := &message.Header{}
+	err := proto.Unmarshal(msg.Body, h)
+	if err != nil {
+		return nil, err
+	}
+	h.SetType(message.NetReceive)
+	h.SetAddr(msg.Addr)
+	h.Id = msg.ID
+
+	return h, nil
+}
+
+var encSharedTag = []byte{encShared}
+
+var noCompressionTag = []byte{NoCompression}
+var gzTag = []byte{GZipped}
+
+// NetSend sends a message over the network
+func (s *Server) NetSend(msg *message.Header, node *Node, compression bool) {
+	msg.Service = msg.Type32
+	msg.SetType(message.NetSend)
+
+	var bts []byte
+	var bb *bytes.Buffer
+
+	pb := getPBuffer(noCompressionTag)
+	if log.Error(pb.Marshal(msg)) {
+		return
+	}
+	bts = pb.Bytes()
+
+	if compression {
+		bb = compress(gzTag, bts[1:])
+		cpBts := bb.Bytes()
+		if len(cpBts) < len(bts) {
+			bts = cpBts
+		} else {
+			bufpool.Put(bb)
+			bb = nil
+		}
+	}
+
+	packets, err := s.packeter.Make(nil, bts, s.loss, s.reliability)
 	if log.Error(err) {
-		w.Close()
-		return append([]byte{0}, msg...)
+		packets = [][]byte{bts}
+	}
+
+	packets = node.Shared(s.priv).SealPackets(encSharedTag, packets, nil, 0)
+
+	pbPool.Put(pb)
+	if bb != nil {
+		bufpool.Put(bb)
+	}
+
+	s.net.SendAll(packets, node.ToAddr)
+}
+
+var pbPool = sync.Pool{
+	New: func() interface{} {
+		return proto.NewBuffer(nil)
+	},
+}
+
+func getPBuffer(tag []byte) *proto.Buffer {
+	b := pbPool.Get().(*proto.Buffer)
+	b.Reset()
+	b.SetBuf(append(b.Bytes(), tag...))
+	return b
+}
+
+func compress(tag, msg []byte) *bytes.Buffer {
+	b := bufpool.Get()
+	_, err := b.Write(tag)
+	if log.Error(err) {
+		return nil
+	}
+	w := gzip.NewWriter(b)
+	_, err = w.Write(msg)
+	if log.Error(err) {
+		log.Error(w.Close())
+		return nil
 	}
 	if log.Error(w.Close()) {
-		return append([]byte{0}, msg...)
+		return nil
 	}
-	zmsg := b.Bytes()
-	if len(zmsg) >= len(msg) {
-		return append([]byte{0}, msg...)
-	}
-	return zmsg
+	return b
 }
 
-func decompress(zmsg []byte) ([]byte, error) {
-	if zmsg[0]&gzipped != gzipped {
-		return zmsg[1:], nil
-	}
-	r, err := gzip.NewReader(bytes.NewBuffer(zmsg[1:]))
+func decompress(zmsg []byte) (*bytes.Buffer, error) {
+	br := bytes.NewBuffer(zmsg)
+	r, err := gzip.NewReader(br)
 	if err != nil {
 		return nil, err
 	}
@@ -70,19 +162,11 @@ func decompress(zmsg []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &bytes.Buffer{}
+	b := bufpool.Get()
 	_, err = b.ReadFrom(r)
+	bufpool.Put(br)
 	if err != nil {
 		return nil, err
 	}
-	return b.Bytes(), nil
-}
-
-func (s *Server) unzip() {
-	for msg := range s.packeter.Chan() {
-		if msg.Err == nil {
-			msg.Body, msg.Err = decompress(msg.Body)
-		}
-		s.netChan <- msg
-	}
+	return b, nil
 }

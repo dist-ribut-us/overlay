@@ -3,6 +3,8 @@ package overlay
 import (
 	"crypto/rand"
 	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/message"
+	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -58,23 +60,32 @@ func TestServer(t *testing.T) {
 	assert.True(t, ok)
 
 	if s1Node, ok := s2.NodeByID(s1.pub.GetID()); assert.True(t, ok) {
-		msg := make([]byte, 1000)
-		rand.Read(msg) // random data will not use compression
-		s2.NetSend(msg, s1Node)
+		msg := message.NewHeader(message.Test, make([]byte, 1000))
+		rand.Read(msg.Body) // random data will not use compression
+		s2.NetSend(msg, s1Node, true)
 
 		select {
-		case msgOut := <-s1.netChan:
+		case msgOut := <-s1.packeter.Chan():
 			assert.NoError(t, msgOut.Err)
-			assert.Equal(t, msg, msgOut.Body)
+			h, err := s1.unmarshalNetMessage(msgOut)
+			assert.NoError(t, err)
+			assert.Equal(t, msg.Body, h.Body)
+			assert.Equal(t, uint32(message.Test), h.Service)
+			assert.Equal(t, message.NetReceive, h.GetType())
 		case <-time.After(50 * time.Millisecond):
 			t.Error("Timed out")
 		}
 
-		s2.NetSend([]byte(loremIpsum), s1Node) // loremIpusm will use compression
+		msg = message.NewHeader(message.Test, loremIpsum)
+
+		s2.NetSend(msg, s1Node, true) // loremIpusm will use compression
 		select {
-		case msgOut := <-s1.netChan:
+		case msgOut := <-s1.packeter.Chan():
 			assert.NoError(t, msgOut.Err)
-			assert.Equal(t, []byte(loremIpsum), msgOut.Body)
+			h, err := s1.unmarshalNetMessage(msgOut)
+			assert.NoError(t, err)
+			assert.Equal(t, loremIpsum, string(h.Body))
+			assert.Equal(t, uint32(message.Test), h.Service)
 		case <-time.After(50 * time.Millisecond):
 			t.Error("Timed out")
 		}
@@ -84,11 +95,24 @@ func TestServer(t *testing.T) {
 func TestCompress(t *testing.T) {
 	// text should achieve a pretty high compression rate
 	text := []byte(loremIpsum)
-	gztxt := compress(text)
+	gztxt := compress(gzTag, text).Bytes()
 	assert.True(t, len(gztxt) < len(text))
-	assert.Equal(t, gzipped, gztxt[0])
+	assert.Equal(t, GZipped, gztxt[0])
 
-	txt, err := decompress(gztxt)
+	bb, err := decompress(gztxt[1:])
 	assert.NoError(t, err)
+	txt := bb.Bytes()
 	assert.Equal(t, text, txt)
+}
+
+func TestGetPBuffer(t *testing.T) {
+	pb := getPBuffer([]byte{111})
+	h := message.NewHeader(message.Test, "this is a test")
+	pb.Marshal(h)
+	b := pb.Bytes()
+	assert.Equal(t, byte(111), b[0])
+	h = &message.Header{}
+	assert.NoError(t, proto.Unmarshal(b[1:], h))
+	assert.Equal(t, message.Test, h.GetType())
+	assert.Equal(t, "this is a test", string(h.Body))
 }
