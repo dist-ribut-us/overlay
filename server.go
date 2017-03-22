@@ -20,6 +20,7 @@ type Server struct {
 	ipc         *ipc.Proc
 	nByID       map[string]*Node
 	nByAddr     map[string]*Node
+	beacons     []*Node
 	mtxNodes    sync.RWMutex
 	loss        float64
 	reliability float64
@@ -30,7 +31,7 @@ type Server struct {
 // NewServer creates an Overlay Server. The server starts off running. An
 // overlay server can route messages from the network to local programs and send
 // messages from local programs to the network.
-func NewServer(proc *ipc.Proc) (*Server, error) {
+func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 	pub, priv := crypto.GenerateKey()
 
 	srv := &Server{
@@ -47,7 +48,7 @@ func NewServer(proc *ipc.Proc) (*Server, error) {
 	}
 
 	var err error
-	srv.net, err = rnet.RunNew(rnet.RandomPort(), srv)
+	srv.net, err = rnet.RunNew(netPort, srv)
 	go proc.Run()
 	return srv, err
 }
@@ -92,6 +93,9 @@ func (s *Server) AddNode(node *Node) *Server {
 	if node.FromAddr != nil {
 		s.nByAddr[node.FromAddr.String()] = node
 	}
+	if node.beacon {
+		s.beacons = append(s.beacons, node)
+	}
 	s.mtxNodes.Unlock()
 	return s
 }
@@ -123,4 +127,10 @@ func (s *Server) Run() {
 			go s.handleIPCMessage(msg)
 		}
 	}
+}
+
+// Stop all processes for the overlay server
+func (s *Server) Stop() {
+	s.net.Stop()
+	s.ipc.Stop()
 }

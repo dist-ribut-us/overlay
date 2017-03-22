@@ -6,11 +6,6 @@ import (
 	"github.com/dist-ribut-us/prog"
 )
 
-const (
-	Send = byte(iota)
-	Register
-)
-
 func main() {
 	log.Contents = log.Truncate
 	log.Panic(log.ToFile(prog.Root() + "overlay.log"))
@@ -21,7 +16,7 @@ func main() {
 	log.Panic(err)
 
 	log.Info(log.Lbl("building_overlay_node"))
-	overlayNode, err := overlay.NewServer(proc)
+	overlayNode, err := overlay.NewServer(proc, 7667)
 	log.Panic(err)
 
 	go overlayNode.SetupNetwork()

@@ -49,7 +49,8 @@ func (s *Server) handleNetMessage(msg *packeter.Package) {
 		log.Info(log.Lbl("no_service_registered_for"), h.Service)
 		return
 	}
-	s.IPCSend(msg.Body, servicePort)
+	log.Info(log.Lbl("net_msg_for_service"), h.Service)
+	s.IPCSend(h.Marshal(), servicePort)
 }
 
 // ErrUnknonNode will occure if a message is received from an unknown address.
@@ -74,13 +75,14 @@ func (s *Server) unmarshalNetMessage(msg *packeter.Package) (*message.Header, er
 	if err != nil {
 		return nil, err
 	}
-	h.SetType(message.NetReceive)
+	h.SetFlag(message.FromNet)
 	node, ok := s.NodeByAddr(msg.Addr)
 	if !ok {
 		return nil, ErrUnknonNode
 	}
 	h.NodeID = node.GetID()[:]
 	h.Id = msg.ID
+	h.SetAddr(msg.Addr)
 
 	return h, nil
 }
@@ -92,9 +94,6 @@ var gzTag = []byte{GZipped}
 
 // NetSend sends a message over the network
 func (s *Server) NetSend(msg *message.Header, node *Node, compression bool) {
-	msg.Service = msg.Type32
-	msg.SetType(message.NetSend)
-
 	var bts []byte
 	var bb *bytes.Buffer
 

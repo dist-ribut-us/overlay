@@ -12,6 +12,7 @@ type Node struct {
 	shared   *crypto.Shared
 	ToAddr   *rnet.Addr
 	FromAddr *rnet.Addr
+	beacon   bool
 }
 
 // Shared gets the shared key for a node

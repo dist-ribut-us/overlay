@@ -3,6 +3,7 @@ package overlay
 import (
 	"crypto/rand"
 	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
@@ -31,16 +32,20 @@ func (s *Server) setIP(t *testing.T, ip string) {
 	s.addr = addr
 }
 
+func init() {
+	log.To(nil)
+}
+
 func TestServer(t *testing.T) {
 	ip := "127.0.0.1"
 	proc1, err := ipc.New(2222)
 	assert.NoError(t, err)
-	s1, err := NewServer(proc1)
+	s1, err := NewServer(proc1, 3222)
 	assert.NoError(t, err)
 	s1.setIP(t, ip)
 	proc2, err := ipc.New(2223)
 	assert.NoError(t, err)
-	s2, err := NewServer(proc2)
+	s2, err := NewServer(proc2, 3223)
 	assert.NoError(t, err)
 	s2.setIP(t, ip)
 
@@ -70,8 +75,7 @@ func TestServer(t *testing.T) {
 			h, err := s1.unmarshalNetMessage(msgOut)
 			assert.NoError(t, err)
 			assert.Equal(t, msg.Body, h.Body)
-			assert.Equal(t, uint32(message.Test), h.Service)
-			assert.Equal(t, message.NetReceive, h.GetType())
+			assert.Equal(t, message.Test, h.GetType())
 		case <-time.After(50 * time.Millisecond):
 			t.Error("Timed out")
 		}
@@ -85,7 +89,7 @@ func TestServer(t *testing.T) {
 			h, err := s1.unmarshalNetMessage(msgOut)
 			assert.NoError(t, err)
 			assert.Equal(t, loremIpsum, string(h.Body))
-			assert.Equal(t, uint32(message.Test), h.Service)
+			assert.Equal(t, message.Test, h.GetType())
 		case <-time.After(50 * time.Millisecond):
 			t.Error("Timed out")
 		}

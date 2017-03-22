@@ -35,7 +35,7 @@ func (s *Server) handshake(hs []byte, addr *rnet.Addr) {
 		log.Info(log.Lbl("handshake_validation_failed"), addr)
 		return
 	}
-
+	log.Info(log.Lbl("handshake_success"), addr)
 	s.AddNode(&Node{
 		Pub:      pub,
 		shared:   shared,
@@ -49,5 +49,6 @@ func (s *Server) handshake(hs []byte, addr *rnet.Addr) {
 // will also see what address the message came from.
 func (s *Server) Handshake(node *Node) error {
 	hs := buildHandshake(s.pub, node.Shared(s.priv))
+	log.Info(log.Lbl("sending_handshake"), node.ToAddr)
 	return s.net.Send(hs, node.ToAddr)
 }
