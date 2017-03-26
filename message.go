@@ -44,13 +44,18 @@ func (s *Server) handleNetMessage(msg *packeter.Package) {
 	if log.Error(err) {
 		return
 	}
-	servicePort, ok := s.services[h.Service]
-	if !ok {
-		log.Info(log.Lbl("no_service_registered_for"), h.Service)
+	var port rnet.Port
+	if originPort, ok := s.callbacks[h.Id]; ok {
+		port = originPort
+	} else if servicePort, ok := s.services[h.Service]; ok {
+		port = servicePort
+	} else {
+		log.Info(log.Lbl("no_service_or_callback_for_msg"))
 		return
 	}
-	log.Info(log.Lbl("net_msg_for_service"), h.Service)
-	s.IPCSend(h.Marshal(), servicePort)
+	id := h.Id
+	h.Id = 0
+	s.ipc.SendWithID(id, h.Marshal(), port)
 }
 
 // ErrUnknonNode will occure if a message is received from an unknown address.
@@ -93,9 +98,12 @@ var noCompressionTag = []byte{NoCompression}
 var gzTag = []byte{GZipped}
 
 // NetSend sends a message over the network
-func (s *Server) NetSend(msg *message.Header, node *Node, compression bool) {
+func (s *Server) NetSend(msg *message.Header, node *Node, compression bool, origin rnet.Port) {
 	var bts []byte
 	var bb *bytes.Buffer
+
+	id := msg.Id
+	msg.Id = 0
 
 	pb := getPBuffer(noCompressionTag)
 	if log.Error(pb.Marshal(msg)) {
@@ -114,7 +122,7 @@ func (s *Server) NetSend(msg *message.Header, node *Node, compression bool) {
 		}
 	}
 
-	packets, err := s.packeter.Make(nil, bts, s.loss, s.reliability)
+	packets, err := s.packeter.Make(nil, bts, s.loss, s.reliability, id)
 	if log.Error(err) {
 		packets = [][]byte{bts}
 	}
@@ -126,7 +134,13 @@ func (s *Server) NetSend(msg *message.Header, node *Node, compression bool) {
 		bufpool.Put(bb)
 	}
 
-	s.net.SendAll(packets, node.ToAddr)
+	if msg.IsQuery() {
+		s.callbacks[id] = origin
+	}
+	errs := s.net.SendAll(packets, node.ToAddr)
+	for _, err := range errs {
+		log.Error(err)
+	}
 }
 
 var pbPool = sync.Pool{

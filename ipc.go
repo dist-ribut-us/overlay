@@ -22,13 +22,16 @@ func (s *Server) Query(t message.Type, body interface{}) *ipc.Base {
 }
 
 // handleIPCMessage responds to a message received over ipc
-func (s *Server) handleIPCMessage(msg *ipc.Package) {
+func (s *Server) handleIPCMessage(b *ipc.Base) {
 	log.Info("msg_on_overlay_ipc")
-	b, err := msg.ToBase()
-	if log.Error(err) {
-		return
-	}
-	if b.IsQuery() {
+	if b.IsToNet() {
+		node, ok := s.nByAddr[b.GetAddr().String()]
+		if !ok {
+			log.Info(log.Lbl("unknown_node"), b.GetAddr().String())
+			return
+		}
+		s.NetSend(b.Header, node, true, b.Port())
+	} else if b.IsQuery() {
 		s.handleQuery(b)
 	} else {
 		s.handleOther(b)
@@ -78,7 +81,7 @@ func (s *Server) handleOther(b *ipc.Base) {
 		}
 		getip.SetType(message.GetIP)
 		getip.SetFlag(message.QueryFlag)
-		s.NetSend(getip, n, true)
+		s.NetSend(getip, n, true, b.Port())
 	case message.Die:
 		os.Exit(0)
 	default:

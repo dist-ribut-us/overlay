@@ -43,11 +43,15 @@ func TestServer(t *testing.T) {
 	s1, err := NewServer(proc1, 3222)
 	assert.NoError(t, err)
 	s1.setIP(t, ip)
+	s1.packeter.Handler = nil
+	defer s1.Close()
 	proc2, err := ipc.New(2223)
 	assert.NoError(t, err)
 	s2, err := NewServer(proc2, 3223)
 	assert.NoError(t, err)
 	s2.setIP(t, ip)
+	s2.packeter.Handler = nil
+	defer s2.Close()
 
 	s2Node := &Node{
 		Pub:      s2.pub,
@@ -62,37 +66,41 @@ func TestServer(t *testing.T) {
 		time.Sleep(time.Millisecond)
 		ok = len(s2.nByID) == 1
 	}
-	assert.True(t, ok)
+	if !assert.True(t, ok) {
+		return
+	}
 
-	if s1Node, ok := s2.NodeByID(s1.pub.GetID()); assert.True(t, ok) {
-		msg := message.NewHeader(message.Test, make([]byte, 1000))
-		rand.Read(msg.Body) // random data will not use compression
-		s2.NetSend(msg, s1Node, true)
+	s1Node, ok := s2.NodeByID(s1.pub.GetID())
+	if !assert.True(t, ok) {
+		return
+	}
+	msg := message.NewHeader(message.Test, make([]byte, 1000))
+	rand.Read(msg.Body) // random data will not use compression
+	s2.NetSend(msg, s1Node, true, s2.NetPort())
 
-		select {
-		case msgOut := <-s1.packeter.Chan():
-			assert.NoError(t, msgOut.Err)
-			h, err := s1.unmarshalNetMessage(msgOut)
-			assert.NoError(t, err)
-			assert.Equal(t, msg.Body, h.Body)
-			assert.Equal(t, message.Test, h.GetType())
-		case <-time.After(50 * time.Millisecond):
-			t.Error("Timed out")
-		}
+	select {
+	case msgOut := <-s1.packeter.Chan():
+		assert.NoError(t, msgOut.Err)
+		h, err := s1.unmarshalNetMessage(msgOut)
+		assert.NoError(t, err)
+		assert.Equal(t, msg.Body, h.Body)
+		assert.Equal(t, message.Test, h.GetType())
+	case <-time.After(50 * time.Millisecond):
+		t.Error("Timed out")
+	}
 
-		msg = message.NewHeader(message.Test, loremIpsum)
+	msg = message.NewHeader(message.Test, loremIpsum)
 
-		s2.NetSend(msg, s1Node, true) // loremIpusm will use compression
-		select {
-		case msgOut := <-s1.packeter.Chan():
-			assert.NoError(t, msgOut.Err)
-			h, err := s1.unmarshalNetMessage(msgOut)
-			assert.NoError(t, err)
-			assert.Equal(t, loremIpsum, string(h.Body))
-			assert.Equal(t, message.Test, h.GetType())
-		case <-time.After(50 * time.Millisecond):
-			t.Error("Timed out")
-		}
+	s2.NetSend(msg, s1Node, true, s2.NetPort()) // loremIpusm will use compression
+	select {
+	case msgOut := <-s1.packeter.Chan():
+		assert.NoError(t, msgOut.Err)
+		h, err := s1.unmarshalNetMessage(msgOut)
+		assert.NoError(t, err)
+		assert.Equal(t, loremIpsum, string(h.Body))
+		assert.Equal(t, message.Test, h.GetType())
+	case <-time.After(50 * time.Millisecond):
+		t.Error("Timed out")
 	}
 }
 

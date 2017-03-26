@@ -26,6 +26,7 @@ type Server struct {
 	reliability float64
 	addr        *rnet.Addr
 	services    map[uint32]rnet.Port
+	callbacks   map[uint32]rnet.Port
 }
 
 // NewServer creates an Overlay Server. The server starts off running. An
@@ -45,11 +46,16 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		loss:        0.01,
 		reliability: 0.999,
 		services:    make(map[uint32]rnet.Port),
+		callbacks:   make(map[uint32]rnet.Port),
 	}
 
 	var err error
 	srv.net, err = rnet.RunNew(netPort, srv)
 	go proc.Run()
+
+	srv.packeter.Handler = srv.handleNetMessage
+	srv.ipc.Handler(srv.handleIPCMessage)
+
 	return srv, err
 }
 
@@ -114,23 +120,8 @@ func (s *Server) NetPort() rnet.Port { return s.net.Port() }
 // IPCPort gets the port used to communicate with other processes
 func (s *Server) IPCPort() rnet.Port { return s.ipc.Port() }
 
-// Run the overlay server listening on both ipc and network channels
-func (s *Server) Run() {
-	ipcCh := s.ipc.Chan()
-	netCh := s.packeter.Chan()
-	log.Info("overlay_listening")
-	for {
-		select {
-		case msg := <-netCh:
-			go s.handleNetMessage(msg)
-		case msg := <-ipcCh:
-			go s.handleIPCMessage(msg)
-		}
-	}
-}
-
-// Stop all processes for the overlay server
-func (s *Server) Stop() {
-	s.net.Stop()
-	s.ipc.Stop()
+// Close stop all processes for the overlay server
+func (s *Server) Close() {
+	s.net.Close()
+	s.ipc.Close()
 }

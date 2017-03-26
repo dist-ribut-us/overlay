@@ -19,7 +19,8 @@ func main() {
 	overlayNode, err := overlay.NewServer(proc, 7667)
 	log.Panic(err)
 
-	go overlayNode.SetupNetwork()
+	overlayNode.SetupNetwork()
 
-	overlayNode.Run()
+	// sleep forever
+	<-make(chan bool)
 }
