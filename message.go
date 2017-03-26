@@ -55,7 +55,7 @@ func (s *Server) handleNetMessage(msg *packeter.Package) {
 	}
 	id := h.Id
 	h.Id = 0
-	s.ipc.SendWithID(id, h.Marshal(), port)
+	s.ipc.Send(id, h.Marshal(), port)
 }
 
 // ErrUnknonNode will occure if a message is received from an unknown address.

@@ -5,15 +5,8 @@ import (
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
-	"github.com/dist-ribut-us/rnet"
 	"os"
-	"time"
 )
-
-// IPCSend is a raw send call to the ipc
-func (s *Server) IPCSend(msg []byte, port rnet.Port) {
-	s.ipc.Send(msg, port)
-}
 
 // Query takes a type and a body and sends an IPC query. For valid body values
 // see dist-ribut-us/message.SetBody.
@@ -58,33 +51,28 @@ func (s *Server) handleOther(b *ipc.Base) {
 		log.Info(log.Lbl("registered_service"), id, b.Port())
 		s.services[id] = b.Port()
 	case message.AddBeacon:
-		addr := b.GetAddr()
-		if addr == nil {
-			log.Info(log.Lbl("cannot_add_beacon_addr_is_nil"))
-			return
-		}
-		pub := crypto.PubFromSlice(b.Body)
-		n := &Node{
-			Pub:      pub,
-			FromAddr: addr,
-			ToAddr:   addr,
-			beacon:   true,
-		}
-		s.AddNode(n)
-		log.Info(log.Lbl("added_beacon"), addr, pub)
-
-		// just for testing
-		s.Handshake(n)
-		time.Sleep(time.Millisecond * 10)
-		getip := &message.Header{
-			Service: 3819762595,
-		}
-		getip.SetType(message.GetIP)
-		getip.SetFlag(message.QueryFlag)
-		s.NetSend(getip, n, true, b.Port())
+		s.addBeacon(b)
 	case message.Die:
 		os.Exit(0)
 	default:
 		log.Info(log.Lbl("unknown_type"), t)
 	}
+}
+
+func (s *Server) addBeacon(b *ipc.Base) {
+	addr := b.GetAddr()
+	if addr == nil {
+		log.Info(log.Lbl("cannot_add_beacon_addr_is_nil"))
+		return
+	}
+	pub := crypto.PubFromSlice(b.Body)
+	n := &Node{
+		Pub:      pub,
+		FromAddr: addr,
+		ToAddr:   addr,
+		beacon:   true,
+	}
+	s.AddNode(n)
+	s.Handshake(n)
+	log.Info(log.Lbl("added_beacon"), addr, pub)
 }
