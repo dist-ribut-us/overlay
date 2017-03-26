@@ -66,10 +66,7 @@ func TestQueryResponse(t *testing.T) {
 
 	serviceA.
 		Query(message.Test, []byte("query_from_A")).
-		SetFlag(message.ToNet).
-		SetAddr(nodeB.ToAddr).
-		SetService(serviceBID).
-		To(overlaySrvA.IPCPort()).
+		ToNet(overlaySrvA.IPCPort(), nodeB.ToAddr, serviceBID).
 		Send(func(r *ipc.Base) {
 			assert.Equal(t, message.Test, r.GetType())
 			assert.True(t, r.IsResponse())
