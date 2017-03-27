@@ -7,18 +7,18 @@ import (
 
 // Node represents a peer on the network running Overlay.
 type Node struct {
-	Pub      *crypto.Pub
+	Pub      *crypto.XchgPub
 	ID       *crypto.ID
-	shared   *crypto.Shared
+	shared   *crypto.Symmetric
 	ToAddr   *rnet.Addr
 	FromAddr *rnet.Addr
 	beacon   bool
 }
 
-// Shared gets the shared key for a node
-func (n *Node) Shared(priv *crypto.Priv) *crypto.Shared {
+// Symmetric gets the shared key for a node
+func (n *Node) Symmetric(priv *crypto.XchgPriv) *crypto.Symmetric {
 	if n.shared == nil {
-		n.shared = n.Pub.Precompute(priv)
+		n.shared = n.Pub.Shared(priv)
 	}
 	return n.shared
 }

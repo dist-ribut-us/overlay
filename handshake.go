@@ -7,7 +7,7 @@ import (
 	"github.com/dist-ribut-us/rnet"
 )
 
-func buildHandshake(pub *crypto.Pub, shared *crypto.Shared) []byte {
+func buildHandshake(pub *crypto.XchgPub, shared *crypto.Symmetric) []byte {
 	box := shared.Seal(pub.Slice(), nil)
 	hs := make([]byte, 1+crypto.KeyLength+len(box))
 	hs[0] = handshake
@@ -16,12 +16,12 @@ func buildHandshake(pub *crypto.Pub, shared *crypto.Shared) []byte {
 	return hs
 }
 
-func validateHandshake(hs []byte, priv *crypto.Priv) (*crypto.Pub, *crypto.Shared, bool) {
+func validateHandshake(hs []byte, priv *crypto.XchgPriv) (*crypto.XchgPub, *crypto.Symmetric, bool) {
 	if len(hs) < 1+crypto.KeyLength {
 		return nil, nil, false
 	}
-	pub := crypto.PubFromSlice(hs[:crypto.KeyLength])
-	shared := pub.Precompute(priv)
+	pub := crypto.XchgPubFromSlice(hs[:crypto.KeyLength])
+	shared := pub.Shared(priv)
 	box, err := shared.Open(hs[crypto.KeyLength:])
 	if err != nil || !bytes.Equal(hs[:crypto.KeyLength], box) {
 		return nil, nil, false
@@ -48,7 +48,7 @@ func (s *Server) handshake(hs []byte, addr *rnet.Addr) {
 // packet will send the public key and sign it with a shared key. The receiver
 // will also see what address the message came from.
 func (s *Server) Handshake(node *Node) error {
-	hs := buildHandshake(s.pub, node.Shared(s.priv))
+	hs := buildHandshake(s.pub, node.Symmetric(s.priv))
 	log.Info(log.Lbl("sending_handshake"), node.ToAddr)
 	return s.net.Send(hs, node.ToAddr)
 }

@@ -10,7 +10,7 @@ func TestHandshakeFormat(t *testing.T) {
 	senderPub, senderPriv := crypto.GenerateKey()
 	receiverPub, receiverPriv := crypto.GenerateKey()
 
-	shared := receiverPub.Precompute(senderPriv)
+	shared := receiverPub.Shared(senderPriv)
 	hs := buildHandshake(senderPub, shared)
 	assert.Equal(t, hs[0], handshake)
 

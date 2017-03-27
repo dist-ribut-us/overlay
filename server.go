@@ -4,6 +4,7 @@ import (
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
+	"github.com/dist-ribut-us/merkle"
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/packeter"
 	"github.com/dist-ribut-us/rnet"
@@ -13,20 +14,21 @@ import (
 // Server represents an overlay server.
 type Server struct {
 	net         *rnet.Server
-	pub         *crypto.Pub
-	priv        *crypto.Priv
+	pub         *crypto.XchgPub
+	priv        *crypto.XchgPriv
 	id          *crypto.ID
 	packeter    *packeter.Packeter
 	ipc         *ipc.Proc
 	nByID       map[string]*Node
 	nByAddr     map[string]*Node
-	beacons     []*Node
+	beacons     []*beacon
 	mtxNodes    sync.RWMutex
 	loss        float64
 	reliability float64
 	addr        *rnet.Addr
 	services    map[uint32]rnet.Port
 	callbacks   map[uint32]rnet.Port
+	forest      *merkle.Forest
 }
 
 // NewServer creates an Overlay Server. The server starts off running. An
@@ -57,6 +59,12 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 	srv.ipc.Handler(srv.handleIPCMessage)
 
 	return srv, err
+}
+
+// Forest opens the merkle forest for the overlay server.
+func (s *Server) Forest(key *crypto.Symmetric, dir string) (err error) {
+	s.forest, err = merkle.Open(dir, key)
+	return
 }
 
 // SetupNetwork tries to connect to the network.
@@ -98,9 +106,6 @@ func (s *Server) AddNode(node *Node) *Server {
 	s.nByID[id] = node
 	if node.FromAddr != nil {
 		s.nByAddr[node.FromAddr.String()] = node
-	}
-	if node.beacon {
-		s.beacons = append(s.beacons, node)
 	}
 	s.mtxNodes.Unlock()
 	return s

@@ -1,7 +1,6 @@
 package overlay
 
 import (
-	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
@@ -57,22 +56,4 @@ func (s *Server) handleOther(b *ipc.Base) {
 	default:
 		log.Info(log.Lbl("unknown_type"), t)
 	}
-}
-
-func (s *Server) addBeacon(b *ipc.Base) {
-	addr := b.GetAddr()
-	if addr == nil {
-		log.Info(log.Lbl("cannot_add_beacon_addr_is_nil"))
-		return
-	}
-	pub := crypto.PubFromSlice(b.Body)
-	n := &Node{
-		Pub:      pub,
-		FromAddr: addr,
-		ToAddr:   addr,
-		beacon:   true,
-	}
-	s.AddNode(n)
-	s.Handshake(n)
-	log.Info(log.Lbl("added_beacon"), addr, pub)
 }
