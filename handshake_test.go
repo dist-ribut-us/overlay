@@ -7,8 +7,8 @@ import (
 )
 
 func TestHandshakeFormat(t *testing.T) {
-	senderPub, senderPriv := crypto.GenerateKey()
-	receiverPub, receiverPriv := crypto.GenerateKey()
+	senderPub, senderPriv := crypto.GenerateXchgKeypair()
+	receiverPub, receiverPriv := crypto.GenerateXchgKeypair()
 
 	shared := receiverPub.Shared(senderPriv)
 	hs := buildHandshake(senderPub, shared)

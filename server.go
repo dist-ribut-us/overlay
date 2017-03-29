@@ -35,7 +35,7 @@ type Server struct {
 // overlay server can route messages from the network to local programs and send
 // messages from local programs to the network.
 func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
-	pub, priv := crypto.GenerateKey()
+	pub, priv := crypto.GenerateXchgKeypair()
 
 	srv := &Server{
 		pub:         pub,
