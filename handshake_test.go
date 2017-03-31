@@ -7,19 +7,16 @@ import (
 )
 
 func TestHandshakeFormat(t *testing.T) {
-	senderPub, senderPriv := crypto.GenerateXchgKeypair()
-	receiverPub, receiverPriv := crypto.GenerateXchgKeypair()
+	senderXPub, _ := crypto.GenerateXchgKeypair()
+	senderSPub, senderSPriv := crypto.GenerateSignKeypair()
 
-	shared := receiverPub.Shared(senderPriv)
-	hs := buildHandshake(senderPub, shared)
-	assert.Equal(t, hs[0], handshake)
+	hs := buildHandshake(handshakeRequest, senderXPub, senderSPriv)
+	assert.Equal(t, hs[0], handshakeRequest)
 
-	pub, sharedOut, ok := validateHandshake(hs[1:], receiverPriv)
+	spub, xpub, ok := validateHandshake(hs, nil)
 	assert.True(t, ok)
-	if pub == nil {
-		t.Error("Should not be nil")
-	} else {
-		assert.Equal(t, senderPub.Slice(), pub.Slice())
-		assert.Equal(t, sharedOut, shared)
+	if assert.NotNil(t, spub) && assert.NotNil(t, xpub) {
+		assert.Equal(t, spub, senderSPub)
+		assert.Equal(t, xpub, senderXPub)
 	}
 }

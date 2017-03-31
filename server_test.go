@@ -54,7 +54,7 @@ func TestServer(t *testing.T) {
 	defer s2.Close()
 
 	s2Node := &Node{
-		Pub:      s2.pub,
+		Pub:      s2.key.Pub(),
 		FromAddr: s2.addr,
 		ToAddr:   s2.addr,
 	}
@@ -70,7 +70,7 @@ func TestServer(t *testing.T) {
 		return
 	}
 
-	s1Node, ok := s2.NodeByID(s1.pub.GetID())
+	s1Node, ok := s2.NodeByID(s1.key.Pub().ID())
 	if !assert.True(t, ok) {
 		return
 	}

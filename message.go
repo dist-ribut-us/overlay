@@ -26,7 +26,7 @@ func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
 		return
 	}
 
-	pPkt, err := node.Symmetric(s.priv).Open(cPkt[1:])
+	pPkt, err := node.Shared.Open(cPkt[1:])
 	if log.Error(errors.Wrap("decrypting overly message", err)) {
 		return
 	}
@@ -85,7 +85,7 @@ func (s *Server) unmarshalNetMessage(msg *packeter.Package) (*message.Header, er
 	if !ok {
 		return nil, ErrUnknonNode
 	}
-	h.NodeID = node.GetID()[:]
+	h.NodeID = node.ID()[:]
 	h.Id = msg.ID
 	h.SetAddr(msg.Addr)
 
@@ -127,7 +127,7 @@ func (s *Server) NetSend(msg *message.Header, node *Node, compression bool, orig
 		packets = [][]byte{bts}
 	}
 
-	packets = node.Symmetric(s.priv).SealPackets(encSymmetricTag, packets, nil, 0)
+	packets = node.Shared.SealPackets(encSymmetricTag, packets, nil, 0)
 
 	pbPool.Put(pb)
 	if bb != nil {

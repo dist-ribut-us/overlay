@@ -35,7 +35,7 @@ func (s *Server) handleQuery(q *ipc.Base) {
 	case message.Ping:
 		q.Respond([]byte{q.Body[0] + 1})
 	case message.GetPubKey:
-		q.Respond(s.pub.Slice())
+		q.Respond(s.key.Pub().Slice())
 	case message.GetPort:
 		q.Respond(uint32(s.NetPort()))
 	default:

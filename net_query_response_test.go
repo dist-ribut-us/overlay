@@ -44,7 +44,7 @@ func TestQueryResponse(t *testing.T) {
 	serviceB.RegisterWithOverlay(serviceBID, overlaySrvB.IPCPort())
 
 	nodeB := &Node{
-		Pub:      overlaySrvB.pub,
+		Pub:      overlaySrvB.key.Pub(),
 		FromAddr: overlaySrvB.addr,
 		ToAddr:   overlaySrvB.addr,
 	}
@@ -58,7 +58,7 @@ func TestQueryResponse(t *testing.T) {
 	}
 	assert.True(t, ok)
 
-	nodeA, ok := overlaySrvB.NodeByID(overlaySrvA.pub.GetID())
+	nodeA, ok := overlaySrvB.NodeByID(overlaySrvA.key.Pub().ID())
 	if !assert.True(t, ok) {
 		return
 	}

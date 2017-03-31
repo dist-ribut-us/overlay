@@ -6,13 +6,15 @@ import (
 )
 
 const (
-	handshake = byte(iota)
+	handshakeRequest = byte(iota)
+	handshakeResponse
 	encSymmetric
 )
 
 var handlers = map[byte]func(*Server, []byte, *rnet.Addr){
-	handshake:    (*Server).handshake,
-	encSymmetric: (*Server).message,
+	handshakeRequest:  (*Server).handleHandshakeRequest,
+	handshakeResponse: (*Server).handleHandshakeResponse,
+	encSymmetric:      (*Server).message,
 }
 
 // Receive fulfills PacketHandler allowing the server to handle network packets

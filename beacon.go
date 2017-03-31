@@ -20,7 +20,7 @@ func (s *Server) addBeacon(b *ipc.Base) {
 		log.Info(log.Lbl("cannot_add_beacon_addr_is_nil"))
 		return
 	}
-	pub := crypto.XchgPubFromSlice(b.Body)
+	pub := crypto.SignPubFromSlice(b.Body)
 	n := &Node{
 		Pub:      pub,
 		FromAddr: addr,
@@ -48,7 +48,7 @@ func (s *Server) loadBeacons() {
 	for key, val, err := s.forest.First(beaconBkt); key != nil && !log.Error(err); key, val, err = s.forest.Next(beaconBkt, key) {
 		addr := message.UnmarshalAddrpb(val).GetAddr()
 		n := &Node{
-			Pub:      crypto.XchgPubFromSlice(key),
+			Pub:      crypto.SignPubFromSlice(key),
 			ToAddr:   addr,
 			FromAddr: addr,
 			beacon:   true,

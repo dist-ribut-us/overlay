@@ -14,9 +14,7 @@ import (
 // Server represents an overlay server.
 type Server struct {
 	net         *rnet.Server
-	pub         *crypto.XchgPub
-	priv        *crypto.XchgPriv
-	id          *crypto.ID
+	key         *crypto.SignPriv
 	packeter    *packeter.Packeter
 	ipc         *ipc.Proc
 	nByID       map[string]*Node
@@ -29,18 +27,17 @@ type Server struct {
 	services    map[uint32]rnet.Port
 	callbacks   map[uint32]rnet.Port
 	forest      *merkle.Forest
+	xchgCache   map[string]*crypto.XchgPriv
 }
 
 // NewServer creates an Overlay Server. The server starts off running. An
 // overlay server can route messages from the network to local programs and send
 // messages from local programs to the network.
 func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
-	pub, priv := crypto.GenerateXchgKeypair()
+	_, key := crypto.GenerateSignKeypair()
 
 	srv := &Server{
-		pub:         pub,
-		priv:        priv,
-		id:          pub.GetID(),
+		key:         key,
 		packeter:    packeter.New(),
 		ipc:         proc,
 		nByID:       make(map[string]*Node),
@@ -49,6 +46,7 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		reliability: 0.999,
 		services:    make(map[uint32]rnet.Port),
 		callbacks:   make(map[uint32]rnet.Port),
+		xchgCache:   make(map[string]*crypto.XchgPriv),
 	}
 
 	var err error
@@ -101,7 +99,7 @@ func (s *Server) NodeByID(id *crypto.ID) (*Node, bool) {
 
 // AddNode will add a node to the server
 func (s *Server) AddNode(node *Node) *Server {
-	id := node.Pub.GetID().String()
+	id := node.Pub.ID().String()
 	s.mtxNodes.Lock()
 	s.nByID[id] = node
 	if node.FromAddr != nil {
@@ -113,10 +111,10 @@ func (s *Server) AddNode(node *Node) *Server {
 
 // PubStr get the public key as as string
 func (s *Server) PubStr() string {
-	if s.pub == nil {
+	if s.key == nil {
 		return ""
 	}
-	return s.pub.String()
+	return s.key.Pub().String()
 }
 
 // NetPort gets the network facing port
