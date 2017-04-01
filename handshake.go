@@ -4,6 +4,7 @@ import (
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/rnet"
+	"time"
 )
 
 const (
@@ -33,26 +34,32 @@ func validateHandshake(hs []byte, expectedSignPub *crypto.SignPub) (*crypto.Sign
 }
 
 func (s *Server) handleHandshakeRequest(hs []byte, addr *rnet.Addr) {
-	signPub, theirXchgPub, ok := validateHandshake(hs, nil)
+	signPub, xchgPub, ok := validateHandshake(hs, nil)
 	if !ok {
 		log.Info(log.Lbl("handshake_validation_failed"), addr)
 		return
 	}
 	log.Info(log.Lbl("handshake_success"), addr)
 
-	myXchgPub, myXchgPriv := crypto.GenerateXchgKeypair()
-
+	id := signPub.ID()
+	// in the unlikely case that we both made the request at the same time
+	s.cacheMux.RLock()
+	keypair := s.xchgCache[id.String()]
+	s.cacheMux.RUnlock()
+	if keypair == nil {
+		keypair = crypto.GenerateXchgPair()
+	}
 	// TODO: hand simultaneous request
 
 	s.AddNode(&Node{
-		id:       signPub.ID(),
+		id:       id,
 		Pub:      signPub,
-		Shared:   theirXchgPub.Shared(myXchgPriv),
+		Shared:   keypair.Shared(xchgPub),
 		FromAddr: addr,
 		ToAddr:   addr, // This may not be right, but it's a good guess
 	})
 
-	resp := buildHandshake(handshakeResponse, myXchgPub, s.key)
+	resp := buildHandshake(handshakeResponse, keypair.Pub(), s.key)
 	log.Info(log.Lbl("sending_handshake_resp"), addr)
 	log.Error(s.net.Send(resp, addr))
 }
@@ -66,25 +73,42 @@ func (s *Server) handleHandshakeResponse(hs []byte, addr *rnet.Addr) {
 	log.Info(log.Lbl("handshake_success"), addr, signPub, xchgPub)
 	id := signPub.ID()
 	idStr := id.String()
-	xchgPriv, ok := s.xchgCache[idStr]
+	s.cacheMux.RLock()
+	keypair, ok := s.xchgCache[idStr]
+	s.cacheMux.RUnlock()
 	if !ok {
 		log.Info(log.Lbl("handshake_response_from_unrequested"), addr)
 	}
-	delete(s.xchgCache, idStr)
 	node, ok := s.NodeByID(id)
 	if !ok {
 		log.Info(log.Lbl("handshake_response_from_unknown"), addr)
 	}
-	node.Shared = xchgPub.Shared(xchgPriv)
+	node.Shared = keypair.Shared(xchgPub)
 }
 
 // Handshake sends a handshake packet to the specified node. The handshake
 // packet will send the public key and sign it with a shared key. The receiver
 // will also see what address the message came from.
 func (s *Server) Handshake(node *Node) error {
-	xchgPub, xchgPriv := crypto.GenerateXchgKeypair()
-	hs := buildHandshake(handshakeRequest, xchgPub, s.key)
-	s.xchgCache[node.ID().String()] = xchgPriv
+	idStr := node.ID().String()
+	keypair := crypto.GenerateXchgPair()
+	hs := buildHandshake(handshakeRequest, keypair.Pub(), s.key)
+
+	s.cacheMux.Lock()
+	s.xchgCache[idStr] = keypair
+	s.cacheMux.Unlock()
+
 	log.Info(log.Lbl("sending_handshake"), node.ToAddr)
-	return s.net.Send(hs, node.ToAddr)
+	err := s.net.Send(hs, node.ToAddr)
+	go s.removeXchgPair(idStr)
+	return err
+}
+
+var removeKeyDelay = time.Second * 2
+
+func (s *Server) removeXchgPair(id string) {
+	time.Sleep(removeKeyDelay)
+	s.cacheMux.Lock()
+	delete(s.xchgCache, id)
+	s.cacheMux.Unlock()
 }

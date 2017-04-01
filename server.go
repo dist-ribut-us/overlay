@@ -27,14 +27,15 @@ type Server struct {
 	services    map[uint32]rnet.Port
 	callbacks   map[uint32]rnet.Port
 	forest      *merkle.Forest
-	xchgCache   map[string]*crypto.XchgPriv
+	xchgCache   map[string]*crypto.XchgPair
+	cacheMux    sync.RWMutex
 }
 
 // NewServer creates an Overlay Server. The server starts off running. An
 // overlay server can route messages from the network to local programs and send
 // messages from local programs to the network.
 func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
-	_, key := crypto.GenerateSignKeypair()
+	_, key := crypto.GenerateSignPair()
 
 	srv := &Server{
 		key:         key,
@@ -46,7 +47,7 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		reliability: 0.999,
 		services:    make(map[uint32]rnet.Port),
 		callbacks:   make(map[uint32]rnet.Port),
-		xchgCache:   make(map[string]*crypto.XchgPriv),
+		xchgCache:   make(map[string]*crypto.XchgPair),
 	}
 
 	var err error
