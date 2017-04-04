@@ -11,6 +11,7 @@ import (
 	"github.com/dist-ribut-us/rnet"
 	"github.com/golang/protobuf/proto"
 	"sync"
+	"time"
 )
 
 // Compression tags
@@ -44,14 +45,23 @@ func (s *Server) handleNetMessage(msg *packeter.Package) {
 	if log.Error(err) {
 		return
 	}
+
 	var port rnet.Port
-	if originPort, ok := s.callbacks[h.Id]; ok {
+	s.callbackMux.RLock()
+	originPort, ok := s.callbacks[h.Id]
+	s.callbackMux.RUnlock()
+	if ok {
 		port = originPort
-	} else if servicePort, ok := s.services[h.Service]; ok {
-		port = servicePort
 	} else {
-		log.Info(log.Lbl("no_service_or_callback_for_msg"))
-		return
+		s.servicesMux.RLock()
+		servicePort, ok := s.services[h.Service]
+		s.servicesMux.RUnlock()
+		if ok {
+			port = servicePort
+		} else {
+			log.Info(log.Lbl("no_service_or_callback_for_msg"), h.Id, h.Service)
+			return
+		}
 	}
 	id := h.Id
 	h.Id = 0
@@ -88,6 +98,9 @@ func (s *Server) unmarshalNetMessage(msg *packeter.Package) (*message.Header, er
 	h.NodeID = node.ID()[:]
 	h.Id = msg.ID
 	h.SetAddr(msg.Addr)
+	if node.TTL > 0 {
+		node.liveTil = time.Now().Add(node.TTL)
+	}
 
 	return h, nil
 }
@@ -97,12 +110,30 @@ var encSymmetricTag = []byte{encSymmetric}
 var noCompressionTag = []byte{NoCompression}
 var gzTag = []byte{GZipped}
 
+// ErrMsgIDZero is returned if there is an attempt to send a message with ID of
+// 0 - this is probably a sign that something isn't correctly setting the ID
+const ErrMsgIDZero = errors.String("Message ID cannot be 0")
+
 // NetSend sends a message over the network
 func (s *Server) NetSend(msg *message.Header, node *Node, compression bool, origin rnet.Port) {
+	s.AddNode(node)
+	if node.Shared == nil || !node.Live() {
+		log.Info(log.Lbl("delay_net_send_for_handshake"), node.Shared == nil, !node.Live(), node.liveTil)
+		s.sendHandshakeRequest(node, func() {
+			log.Info(log.Lbl("handshake_complete:resuming"))
+			s.NetSend(msg, node, compression, origin)
+		})
+		return
+	}
+
 	var bts []byte
 	var bb *bytes.Buffer
 
 	id := msg.Id
+	if id == 0 {
+		log.Error(ErrMsgIDZero)
+		return
+	}
 	msg.Id = 0
 
 	pb := getPBuffer(noCompressionTag)
@@ -135,7 +166,9 @@ func (s *Server) NetSend(msg *message.Header, node *Node, compression bool, orig
 	}
 
 	if msg.IsQuery() {
+		s.callbackMux.Lock()
 		s.callbacks[id] = origin
+		s.callbackMux.Unlock()
 	}
 	errs := s.net.SendAll(packets, node.ToAddr)
 	for _, err := range errs {

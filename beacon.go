@@ -25,17 +25,18 @@ func (s *Server) addBeacon(b *ipc.Base) {
 		Pub:      pub,
 		FromAddr: addr,
 		ToAddr:   addr,
-		beacon:   true,
 	}
 	s.AddNode(n)
-	s.Handshake(n)
-	log.Info(log.Lbl("added_beacon"), addr, pub)
+	s.sendHandshakeRequest(n, func() {
+		log.Info(log.Lbl("added_beacon"), addr, pub)
 
-	bcn := &beacon{
-		node:    n,
-		overlay: s,
-	}
-	s.beacons = append(s.beacons, bcn)
+		bcn := &beacon{
+			node:    n,
+			overlay: s,
+		}
+		s.beacons = append(s.beacons, bcn)
+	})
+
 }
 
 func (b *beacon) save() {
@@ -51,7 +52,6 @@ func (s *Server) loadBeacons() {
 			Pub:      crypto.SignPubFromSlice(key),
 			ToAddr:   addr,
 			FromAddr: addr,
-			beacon:   true,
 		}
 		b := &beacon{
 			overlay: s,

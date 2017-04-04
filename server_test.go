@@ -1,15 +1,20 @@
 package overlay
 
 import (
-	"crypto/rand"
-	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
+	"github.com/dist-ribut-us/rnet"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
+
+var portInc uint16 = 5555
+
+func getPort() rnet.Port {
+	portInc++
+	return rnet.Port(portInc)
+}
 
 const loremIpsum = `Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 Nullam eu interdum nibh, vel malesuada nunc. Morbi sit amet augue finibus magna
@@ -33,75 +38,16 @@ func (s *Server) setIP(t *testing.T, ip string) {
 }
 
 func init() {
-	log.To(nil)
+	log.Mute()
 }
 
-func TestServer(t *testing.T) {
-	ip := "127.0.0.1"
-	proc1, err := ipc.New(2222)
-	assert.NoError(t, err)
-	s1, err := NewServer(proc1, 3222)
-	assert.NoError(t, err)
-	s1.setIP(t, ip)
-	s1.packeter.Handler = nil
-	defer s1.Close()
-	proc2, err := ipc.New(2223)
-	assert.NoError(t, err)
-	s2, err := NewServer(proc2, 3223)
-	assert.NoError(t, err)
-	s2.setIP(t, ip)
-	s2.packeter.Handler = nil
-	defer s2.Close()
+func unmute() {
+	log.ToStdOut()
+	log.SetDebug(true)
+}
 
-	s2Node := &Node{
-		Pub:      s2.key.Pub(),
-		FromAddr: s2.addr,
-		ToAddr:   s2.addr,
-	}
-	s1.AddNode(s2Node)
-	s1.Handshake(s2Node)
-
-	ok := false
-	for i := 0; i < 10 && !ok; i++ {
-		time.Sleep(time.Millisecond)
-		ok = len(s2.nByID) == 1
-	}
-	if !assert.True(t, ok) {
-		return
-	}
-
-	s1Node, ok := s2.NodeByID(s1.key.Pub().ID())
-	if !assert.True(t, ok) {
-		return
-	}
-	msg := message.NewHeader(message.Test, make([]byte, 1000))
-	rand.Read(msg.Body) // random data will not use compression
-	s2.NetSend(msg, s1Node, true, s2.NetPort())
-
-	select {
-	case msgOut := <-s1.packeter.Chan():
-		assert.NoError(t, msgOut.Err)
-		h, err := s1.unmarshalNetMessage(msgOut)
-		assert.NoError(t, err)
-		assert.Equal(t, msg.Body, h.Body)
-		assert.Equal(t, message.Test, h.GetType())
-	case <-time.After(50 * time.Millisecond):
-		t.Error("Timed out")
-	}
-
-	msg = message.NewHeader(message.Test, loremIpsum)
-
-	s2.NetSend(msg, s1Node, true, s2.NetPort()) // loremIpusm will use compression
-	select {
-	case msgOut := <-s1.packeter.Chan():
-		assert.NoError(t, msgOut.Err)
-		h, err := s1.unmarshalNetMessage(msgOut)
-		assert.NoError(t, err)
-		assert.Equal(t, loremIpsum, string(h.Body))
-		assert.Equal(t, message.Test, h.GetType())
-	case <-time.After(50 * time.Millisecond):
-		t.Error("Timed out")
-	}
+func mute() {
+	log.Mute()
 }
 
 func TestCompress(t *testing.T) {

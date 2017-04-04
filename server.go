@@ -20,15 +20,18 @@ type Server struct {
 	nByID       map[string]*Node
 	nByAddr     map[string]*Node
 	beacons     []*beacon
-	mtxNodes    sync.RWMutex
+	nodesMux    sync.RWMutex
 	loss        float64
 	reliability float64
 	addr        *rnet.Addr
 	services    map[uint32]rnet.Port
+	servicesMux sync.RWMutex
 	callbacks   map[uint32]rnet.Port
+	callbackMux sync.RWMutex
 	forest      *merkle.Forest
 	xchgCache   map[string]*crypto.XchgPair
 	cacheMux    sync.RWMutex
+	NodeTTL     uint32 // default TTL in seconds
 }
 
 // NewServer creates an Overlay Server. The server starts off running. An
@@ -45,9 +48,10 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		nByAddr:     make(map[string]*Node),
 		loss:        0.01,
 		reliability: 0.999,
-		services:    make(map[uint32]rnet.Port),
+		services:    map[uint32]rnet.Port{serviceID: proc.Port()},
 		callbacks:   make(map[uint32]rnet.Port),
 		xchgCache:   make(map[string]*crypto.XchgPair),
+		NodeTTL:     60 * 60, // one hour
 	}
 
 	var err error
@@ -84,29 +88,29 @@ func (s *Server) SetupNetwork() {
 
 // NodeByAddr gets a node using an address
 func (s *Server) NodeByAddr(addr *rnet.Addr) (*Node, bool) {
-	s.mtxNodes.RLock()
+	s.nodesMux.RLock()
 	node, ok := s.nByAddr[addr.String()]
-	s.mtxNodes.RUnlock()
+	s.nodesMux.RUnlock()
 	return node, ok
 }
 
 // NodeByID gets a node using a crypto.ID
 func (s *Server) NodeByID(id *crypto.ID) (*Node, bool) {
-	s.mtxNodes.RLock()
+	s.nodesMux.RLock()
 	node, ok := s.nByID[id.String()]
-	s.mtxNodes.RUnlock()
+	s.nodesMux.RUnlock()
 	return node, ok
 }
 
 // AddNode will add a node to the server
 func (s *Server) AddNode(node *Node) *Server {
 	id := node.Pub.ID().String()
-	s.mtxNodes.Lock()
+	s.nodesMux.Lock()
 	s.nByID[id] = node
 	if node.FromAddr != nil {
 		s.nByAddr[node.FromAddr.String()] = node
 	}
-	s.mtxNodes.Unlock()
+	s.nodesMux.Unlock()
 	return s
 }
 
@@ -126,6 +130,7 @@ func (s *Server) IPCPort() rnet.Port { return s.ipc.Port() }
 
 // Close stop all processes for the overlay server
 func (s *Server) Close() {
+	log.Info("closing_overlay_server")
 	s.net.Close()
 	s.ipc.Close()
 }
