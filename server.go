@@ -58,15 +58,78 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 	return s, err
 }
 
+// SetKey will set the key on the server. If a forest has been initilized, it
+// will check if the server is configured to use a static key and use that if
+// so. Otherwise it will set a random key.
+func (s *Server) SetKey() error {
+	if s.forest == nil {
+		s.RandomKey()
+		return nil
+	}
+	static, err := s.GetStaticKey()
+	if err != nil {
+		return err
+	}
+	if static {
+		return s.LoadKey()
+	}
+	s.RandomKey()
+	return nil
+}
+
+// RandomKey sets the servers signing key to a random key value
 func (s *Server) RandomKey() {
 	_, s.key = crypto.GenerateSignPair()
 }
 
 var configBkt = []byte("config")
 var keykey = []byte("key_______")
+var statickey = []byte("statickey_")
 
+// ErrNoForest is returned when attempting to perform Overlay operations that
+// require a storage forest before one is initilized
 const ErrNoForest = errors.String("Overlay does not have forest")
 
+// SetStaticKey sets the static key config value. If set to true, the current
+// key value is saved.
+func (s *Server) SetStaticKey(val bool) error {
+	if s.forest == nil {
+		return ErrNoForest
+	}
+	var b byte
+	if val {
+		b = 1
+	}
+	err := s.forest.SetValue(configBkt, statickey, []byte{b})
+	if err != nil {
+		return err
+	}
+	if !val {
+		return nil
+	}
+	if s.key == nil {
+		s.RandomKey()
+	}
+	return s.forest.SetValue(configBkt, keykey, s.key.Slice())
+}
+
+// GetStaticKey returns the current config value of statickey
+func (s *Server) GetStaticKey() (bool, error) {
+	if s.forest == nil {
+		return false, ErrNoForest
+	}
+	val, err := s.forest.GetValue(configBkt, statickey)
+	if err != nil {
+		return false, err
+	}
+	if len(val) < 1 {
+		return false, nil
+	}
+	return val[0] == 1, nil
+}
+
+// LoadKey will load the signing key from the forest, if one exists, otherwise
+// it will create a random key and save it.
 func (s *Server) LoadKey() error {
 	if s.forest == nil {
 		return ErrNoForest
@@ -78,10 +141,9 @@ func (s *Server) LoadKey() error {
 
 	if val == nil {
 		_, s.key = crypto.GenerateSignPair()
-		s.forest.SetValue(configBkt, keykey, s.key.Slice())
-	} else {
-		s.key = crypto.SignPrivFromSlice(val)
+		return s.forest.SetValue(configBkt, keykey, s.key.Slice())
 	}
+	s.key = crypto.SignPrivFromSlice(val)
 	return nil
 }
 
@@ -94,6 +156,7 @@ func (s *Server) Run() {
 // Forest opens the merkle forest for the overlay server.
 func (s *Server) Forest(key *crypto.Symmetric, dir string) (err error) {
 	s.forest, err = merkle.Open(dir, key)
+	s.forest.MakeBuckets(configBkt)
 	return
 }
 

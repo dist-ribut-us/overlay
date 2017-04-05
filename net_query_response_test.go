@@ -1,9 +1,11 @@
 package overlay
 
 import (
+	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/message"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 	"time"
 )
@@ -99,4 +101,35 @@ func TestQueryResponse(t *testing.T) {
 	a, ok := overlaySrvB.nodeByID(overlaySrvA.key.Pub().ID())
 	assert.True(t, ok)
 	assert.True(t, a.TTL > 0)
+
+	dirStr := "testDir"
+	os.RemoveAll(dirStr)
+	defer os.RemoveAll(dirStr)
+	key := crypto.RandomSymmetric()
+
+	err = overlaySrvA.Forest(key, dirStr)
+	assert.NoError(t, err)
+
+	static, err := overlaySrvA.GetStaticKey()
+	assert.NoError(t, err)
+	assert.False(t, static)
+
+	oldkey := overlaySrvA.key
+	overlaySrvA.key = nil
+	overlaySrvA.SetStaticKey(true)
+	static, err = overlaySrvA.GetStaticKey()
+	assert.NoError(t, err)
+	assert.True(t, static)
+	overlaySrvA.SetKey()
+	assert.NotEqual(t, oldkey, overlaySrvA.key)
+	oldkey = overlaySrvA.key
+	overlaySrvA.SetKey()
+	assert.Equal(t, oldkey, overlaySrvA.key)
+
+	overlaySrvA.SetStaticKey(false)
+	static, err = overlaySrvA.GetStaticKey()
+	assert.NoError(t, err)
+	assert.False(t, static)
+	overlaySrvA.SetKey()
+	assert.NotEqual(t, oldkey, overlaySrvA.key)
 }
