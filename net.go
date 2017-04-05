@@ -21,13 +21,13 @@ const (
 )
 
 func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
-	node, ok := s.nodeByAddr(addr)
+	n, ok := s.nodeByAddr(addr)
 	if !ok {
 		log.Info(log.Lbl("unknown_node"), addr)
 		return
 	}
 
-	pPkt, err := node.Shared.Open(cPkt[1:])
+	pPkt, err := n.Shared.Open(cPkt[1:])
 	if log.Error(errors.Wrap("decrypting overly message", err)) {
 		return
 	}
@@ -91,15 +91,15 @@ func (s *Server) unmarshalNetMessage(msg *packeter.Package) (*message.Header, er
 		return nil, err
 	}
 	h.SetFlag(message.FromNet)
-	node, ok := s.nodeByAddr(msg.Addr)
+	n, ok := s.nodeByAddr(msg.Addr)
 	if !ok {
 		return nil, ErrUnknonNode
 	}
-	h.NodeID = node.ID()[:]
+	h.NodeID = n.id()[:]
 	h.Id = msg.ID
 	h.SetAddr(msg.Addr)
-	if node.TTL > 0 {
-		node.liveTil = time.Now().Add(node.TTL)
+	if n.TTL > 0 {
+		n.liveTil = time.Now().Add(n.TTL)
 	}
 
 	return h, nil
@@ -114,13 +114,13 @@ var gzTag = []byte{GZipped}
 // 0 - this is probably a sign that something isn't correctly setting the ID
 const ErrMsgIDZero = errors.String("Message ID cannot be 0")
 
-func (s *Server) netSend(msg *message.Header, node *Node, compression bool, origin rnet.Port) {
-	s.AddNode(node)
-	if node.Shared == nil || !node.Live() {
-		log.Info(log.Lbl("delay_net_send_for_handshake"), node.Shared == nil, !node.Live(), node.liveTil)
-		s.sendHandshakeRequest(node, func() {
+func (s *Server) netSend(msg *message.Header, n *node, compression bool, origin rnet.Port) {
+	s.addNode(n)
+	if n.Shared == nil || !n.live() {
+		log.Info(log.Lbl("delay_net_send_for_handshake"), n.Shared == nil, !n.live(), n.liveTil)
+		s.sendHandshakeRequest(n, func() {
 			log.Info(log.Lbl("handshake_complete:resuming"))
-			s.netSend(msg, node, compression, origin)
+			s.netSend(msg, n, compression, origin)
 		})
 		return
 	}
@@ -157,7 +157,7 @@ func (s *Server) netSend(msg *message.Header, node *Node, compression bool, orig
 		packets = [][]byte{bts}
 	}
 
-	packets = node.Shared.SealPackets(encSymmetricTag, packets, nil, 0)
+	packets = n.Shared.SealPackets(encSymmetricTag, packets, nil, 0)
 
 	pbPool.Put(pb)
 	if bb != nil {
@@ -169,7 +169,7 @@ func (s *Server) netSend(msg *message.Header, node *Node, compression bool, orig
 		s.callbacks[id] = origin
 		s.callbackMux.Unlock()
 	}
-	errs := s.net.SendAll(packets, node.ToAddr)
+	errs := s.net.SendAll(packets, n.ToAddr)
 	for _, err := range errs {
 		log.Error(err)
 	}

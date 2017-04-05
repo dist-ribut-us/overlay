@@ -56,23 +56,23 @@ func (s *Server) handleHandshakeRequest(hs []byte, addr *rnet.Addr) {
 		keypair = crypto.GenerateXchgPair()
 	}
 
-	if node, ok := s.nodeByAddr(addr); ok {
-		if node.Pub != nil && *node.Pub != *signPub {
+	if n, ok := s.nodeByAddr(addr); ok {
+		if n.Pub != nil && *n.Pub != *signPub {
 			log.Error(ErrBadSignPub)
 			return
 		}
-		node.Shared = keypair.Shared(xchgPub)
-		node.liveTil = time.Now().Add(time.Duration(s.NodeTTL) * time.Second)
+		n.Shared = keypair.Shared(xchgPub)
+		n.liveTil = time.Now().Add(time.Duration(s.NodeTTL) * time.Second)
 	} else {
-		node := &Node{
-			id:       id,
+		n := &node{
+			cachedID: id,
 			Pub:      signPub,
 			Shared:   keypair.Shared(xchgPub),
 			FromAddr: addr,
 			ToAddr:   addr, // This may not be right, but it's a good guess
 			liveTil:  time.Now().Add(time.Duration(s.NodeTTL) * time.Second),
 		}
-		s.AddNode(node)
+		s.addNode(n)
 	}
 
 	resp := buildHandshake(handshakeResponse, keypair.Pub(), s.key)
@@ -99,34 +99,34 @@ func (s *Server) handleHandshakeResponse(hs []byte, addr *rnet.Addr) {
 	if !ok {
 		log.Info(log.Lbl("handshake_response_from_unrequested"), addr)
 	}
-	node, ok := s.nodeByID(id)
+	n, ok := s.nodeByID(id)
 	if !ok {
 		log.Info(log.Lbl("handshake_response_from_unknown"), addr)
 	}
-	node.Shared = keypair.Shared(xchgPub)
+	n.Shared = keypair.Shared(xchgPub)
 
-	node.liveTil = time.Now().Add(time.Duration(s.NodeTTL) * time.Second)
+	n.liveTil = time.Now().Add(time.Duration(s.NodeTTL) * time.Second)
 
 	s.ipc.
 		Query(message.SessionData, s.NodeTTL).
-		ToNet(s.ipc.Port(), node.ToAddr, serviceID).
+		ToNet(s.ipc.Port(), n.ToAddr, serviceID).
 		Send(func(r *ipc.Base) {
 			ttl := r.BodyToUint32()
 			if ttl > s.NodeTTL {
 				ttl = s.NodeTTL
 			}
-			node.TTL = time.Duration(ttl) * time.Second
-			node.liveTil = time.Now().Add(node.TTL)
+			n.TTL = time.Duration(ttl) * time.Second
+			n.liveTil = time.Now().Add(n.TTL)
 		})
 
-	if node.hsCallback != nil {
-		go node.hsCallback()
-		node.hsCallback = nil
+	if n.hsCallback != nil {
+		go n.hsCallback()
+		n.hsCallback = nil
 	}
 }
 
-func (s *Server) sendHandshakeRequest(node *Node, callback func()) error {
-	id := node.ID()
+func (s *Server) sendHandshakeRequest(n *node, callback func()) error {
+	id := n.id()
 	idStr := id.String()
 
 	s.cacheMux.Lock()
@@ -139,10 +139,10 @@ func (s *Server) sendHandshakeRequest(node *Node, callback func()) error {
 	s.cacheMux.Unlock()
 
 	hs := buildHandshake(handshakeRequest, keypair.Pub(), s.key)
-	node.hsCallback = callback
+	n.hsCallback = callback
 
-	log.Info(log.Lbl("sending_handshake_request"), node.ToAddr)
-	err := s.net.Send(hs, node.ToAddr)
+	log.Info(log.Lbl("sending_handshake_request"), n.ToAddr)
+	err := s.net.Send(hs, n.ToAddr)
 	return err
 }
 
@@ -160,7 +160,7 @@ func (s *Server) handleSessionDataQuery(q *ipc.Base) {
 	if log.Error(err) {
 		return
 	}
-	node, ok := s.nodeByID(nodeID)
+	n, ok := s.nodeByID(nodeID)
 	if !ok {
 		return
 	}
@@ -168,8 +168,8 @@ func (s *Server) handleSessionDataQuery(q *ipc.Base) {
 	if ttl > s.NodeTTL {
 		ttl = s.NodeTTL
 	}
-	node.TTL = time.Duration(ttl) * time.Second
-	node.liveTil = time.Now().Add(node.TTL)
+	n.TTL = time.Duration(ttl) * time.Second
+	n.liveTil = time.Now().Add(n.TTL)
 
 	q.Respond(s.NodeTTL)
 }

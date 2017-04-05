@@ -17,9 +17,9 @@ type Server struct {
 	key         *crypto.SignPriv
 	packeter    *packeter.Packeter
 	ipc         *ipc.Proc
-	nByID       map[string]*Node
-	nByAddr     map[string]*Node
-	beacons     []*Node
+	nByID       map[string]*node
+	nByAddr     map[string]*node
+	beacons     []*node
 	nodesMux    sync.RWMutex
 	loss        float64
 	reliability float64
@@ -44,8 +44,8 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		key:         key,
 		packeter:    packeter.New(),
 		ipc:         proc,
-		nByID:       make(map[string]*Node),
-		nByAddr:     make(map[string]*Node),
+		nByID:       make(map[string]*node),
+		nByAddr:     make(map[string]*node),
 		loss:        0.01,
 		reliability: 0.999,
 		services:    map[uint32]rnet.Port{serviceID: proc.Port()},
@@ -86,27 +86,26 @@ func (s *Server) SetupNetwork() {
 	log.Info(log.Lbl("IPC>"), s.ipc.Port().On("127.0.0.1"), log.Lbl("Net>"), addr, s.key.Pub())
 }
 
-func (s *Server) nodeByAddr(addr *rnet.Addr) (*Node, bool) {
+func (s *Server) nodeByAddr(addr *rnet.Addr) (*node, bool) {
 	s.nodesMux.RLock()
-	node, ok := s.nByAddr[addr.String()]
+	n, ok := s.nByAddr[addr.String()]
 	s.nodesMux.RUnlock()
-	return node, ok
+	return n, ok
 }
 
-func (s *Server) nodeByID(id *crypto.ID) (*Node, bool) {
+func (s *Server) nodeByID(id *crypto.ID) (*node, bool) {
 	s.nodesMux.RLock()
-	node, ok := s.nByID[id.String()]
+	n, ok := s.nByID[id.String()]
 	s.nodesMux.RUnlock()
-	return node, ok
+	return n, ok
 }
 
-// AddNode will add a node to the server
-func (s *Server) AddNode(node *Node) *Server {
-	id := node.Pub.ID().String()
+func (s *Server) addNode(n *node) *Server {
+	id := n.Pub.ID().String()
 	s.nodesMux.Lock()
-	s.nByID[id] = node
-	if node.FromAddr != nil {
-		s.nByAddr[node.FromAddr.String()] = node
+	s.nByID[id] = n
+	if n.FromAddr != nil {
+		s.nByAddr[n.FromAddr.String()] = n
 	}
 	s.nodesMux.Unlock()
 	return s

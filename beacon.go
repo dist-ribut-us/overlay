@@ -20,7 +20,7 @@ func (s *Server) handleAddBeacon(b *ipc.Base) {
 	s.addBeacon(pub, addr)
 }
 
-func (s *Server) saveBeacon(b *Node) {
+func (s *Server) saveBeacon(b *node) {
 	buf := message.FromAddr(b.ToAddr).Marshal()
 	key := b.Pub.Slice()
 	s.forest.SetValue(beaconBkt, key, buf)
@@ -35,12 +35,12 @@ func (s *Server) loadBeacons() {
 }
 
 func (s *Server) addBeacon(pub *crypto.SignPub, addr *rnet.Addr) {
-	n := &Node{
+	n := &node{
 		Pub:      pub,
 		FromAddr: addr,
 		ToAddr:   addr,
 	}
-	s.AddNode(n)
+	s.addNode(n)
 	s.nodesMux.Lock()
 	s.beacons = append(s.beacons, n)
 	s.nodesMux.Unlock()

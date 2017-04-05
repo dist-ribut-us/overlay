@@ -13,12 +13,12 @@ const serviceID uint32 = 4200394536
 func (s *Server) handleIPCMessage(b *ipc.Base) {
 	if b.IsToNet() {
 		b.UnsetFlag(message.ToNet)
-		node, ok := s.nByAddr[b.GetAddr().String()]
+		n, ok := s.nByAddr[b.GetAddr().String()]
 		if !ok {
 			log.Info(log.Lbl("unknown_node"), b.GetAddr().String())
 			return
 		}
-		s.netSend(b.Header, node, true, b.Port())
+		s.netSend(b.Header, n, true, b.Port())
 	} else if b.IsQuery() {
 		s.handleQuery(b)
 	} else {

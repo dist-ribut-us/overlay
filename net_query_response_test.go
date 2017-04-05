@@ -42,12 +42,12 @@ func TestQueryResponse(t *testing.T) {
 	serviceB.RegisterWithOverlay(serviceBID, overlaySrvB.ipc.Port())
 
 	// overlayA needs to know about nodeB before it can send the handshake
-	nodeB := &Node{
+	nodeB := &node{
 		Pub:      overlaySrvB.key.Pub(),
 		FromAddr: overlaySrvB.addr,
 		ToAddr:   overlaySrvB.addr,
 	}
-	overlaySrvA.AddNode(nodeB)
+	overlaySrvA.addNode(nodeB)
 
 	// Before sending the request from A, setup the handler in B
 	out := make(chan string)

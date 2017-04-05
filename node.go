@@ -6,10 +6,9 @@ import (
 	"time"
 )
 
-// Node represents a peer on the network running Overlay.
-type Node struct {
+type node struct {
 	Pub        *crypto.SignPub
-	id         *crypto.ID
+	cachedID   *crypto.ID
 	Shared     *crypto.Symmetric
 	ToAddr     *rnet.Addr
 	FromAddr   *rnet.Addr
@@ -18,15 +17,13 @@ type Node struct {
 	hsCallback func()
 }
 
-// ID returns the ID for the public key
-func (n *Node) ID() *crypto.ID {
-	if n.id == nil {
-		n.id = n.Pub.ID()
+func (n *node) id() *crypto.ID {
+	if n.cachedID == nil {
+		n.cachedID = n.Pub.ID()
 	}
-	return n.id
+	return n.cachedID
 }
 
-// Live returns true if the connection is still alive
-func (n *Node) Live() bool {
+func (n *node) live() bool {
 	return n.liveTil.After(time.Now())
 }
