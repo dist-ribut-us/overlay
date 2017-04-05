@@ -23,6 +23,8 @@ func TestQueryResponse(t *testing.T) {
 	overlaySrvA, err := NewServer(overlayProcA, getPort())
 	assert.NoError(t, err)
 	overlaySrvA.setIP(t, ip)
+	overlaySrvA.RandomKey()
+	go overlaySrvA.Run()
 	defer overlaySrvA.Close()
 
 	// setup service and overlay for B
@@ -34,6 +36,8 @@ func TestQueryResponse(t *testing.T) {
 	overlaySrvB, err := NewServer(overlayProcB, getPort())
 	assert.NoError(t, err)
 	overlaySrvB.setIP(t, ip)
+	overlaySrvB.RandomKey()
+	go overlaySrvB.Run()
 	defer overlaySrvB.Close()
 
 	// serviceA is going to make a request from serviceB, in order for overlayB

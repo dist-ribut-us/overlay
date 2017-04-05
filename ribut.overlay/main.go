@@ -16,13 +16,11 @@ func main() {
 	log.Panic(err)
 
 	log.Info(log.Lbl("building_overlay_node"))
-	overlayNode, err := overlay.NewServer(proc, 7667)
-	log.Panic(err)
-	overlayNode.Forest(key, prog.UserHomeDir()+"overlay")
+	overlayNode := overlay.NewServer(proc)
+	err = overlayNode.Forest(key, prog.UserHomeDir()+"overlay")
 	log.Panic(err)
 
 	overlayNode.SetupNetwork()
 
-	// sleep forever
-	<-make(chan bool)
+	overlayNode.Run(7667)
 }

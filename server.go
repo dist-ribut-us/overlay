@@ -2,6 +2,7 @@ package overlay
 
 import (
 	"github.com/dist-ribut-us/crypto"
+	"github.com/dist-ribut-us/errors"
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/merkle"
@@ -38,10 +39,7 @@ type Server struct {
 // overlay server can route messages from the network to local programs and send
 // messages from local programs to the network.
 func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
-	_, key := crypto.GenerateSignPair()
-
-	srv := &Server{
-		key:         key,
+	s := &Server{
 		packeter:    packeter.New(),
 		ipc:         proc,
 		nByID:       make(map[string]*node),
@@ -53,15 +51,44 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		xchgCache:   make(map[string]*crypto.XchgPair),
 		NodeTTL:     60 * 60, // one hour
 	}
-
+	s.packeter.Handler = s.handleNetMessage
+	s.ipc.Handler(s.handleIPCMessage)
 	var err error
-	srv.net, err = rnet.RunNew(netPort, srv)
-	go proc.Run()
+	s.net, err = rnet.New(netPort, s)
+	return s, err
+}
 
-	srv.packeter.Handler = srv.handleNetMessage
-	srv.ipc.Handler(srv.handleIPCMessage)
+func (s *Server) RandomKey() {
+	_, s.key = crypto.GenerateSignPair()
+}
 
-	return srv, err
+var configBkt = []byte("config")
+var keykey = []byte("key_______")
+
+const ErrNoForest = errors.String("Overlay does not have forest")
+
+func (s *Server) LoadKey() error {
+	if s.forest == nil {
+		return ErrNoForest
+	}
+	val, err := s.forest.GetValue(configBkt, keykey)
+	if err != nil {
+		return err
+	}
+
+	if val == nil {
+		_, s.key = crypto.GenerateSignPair()
+		s.forest.SetValue(configBkt, keykey, s.key.Slice())
+	} else {
+		s.key = crypto.SignPrivFromSlice(val)
+	}
+	return nil
+}
+
+// Run the overlay server
+func (s *Server) Run() {
+	go s.net.Run()
+	s.ipc.Run()
 }
 
 // Forest opens the merkle forest for the overlay server.
