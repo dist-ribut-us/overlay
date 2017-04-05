@@ -5,7 +5,6 @@ import (
 	"github.com/dist-ribut-us/ipc"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
-	"github.com/dist-ribut-us/rnet"
 )
 
 var beaconBkt = []byte("beacon")
@@ -32,16 +31,4 @@ func (s *Server) loadBeacons() {
 		addr := message.UnmarshalAddrpb(val).GetAddr()
 		s.addBeacon(pub, addr)
 	}
-}
-
-func (s *Server) addBeacon(pub *crypto.SignPub, addr *rnet.Addr) {
-	n := &node{
-		Pub:      pub,
-		FromAddr: addr,
-		ToAddr:   addr,
-	}
-	s.addNode(n)
-	s.nodesMux.Lock()
-	s.beacons = append(s.beacons, n)
-	s.nodesMux.Unlock()
 }

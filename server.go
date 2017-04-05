@@ -9,19 +9,15 @@ import (
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/packeter"
 	"github.com/dist-ribut-us/rnet"
-	"sync"
 )
 
 // Server represents an overlay server.
 type Server struct {
+	*nodes
 	net         *rnet.Server
 	key         *crypto.SignPriv
 	packeter    *packeter.Packeter
 	ipc         *ipc.Proc
-	nByID       map[string]*node
-	nByAddr     map[string]*node
-	beacons     []*node
-	nodesMux    sync.RWMutex
 	loss        float64
 	reliability float64
 	addr        *rnet.Addr
@@ -32,15 +28,15 @@ type Server struct {
 	NodeTTL     uint32 // default TTL in seconds
 }
 
-// NewServer creates an Overlay Server. The server starts off running. An
-// overlay server can route messages from the network to local programs and send
-// messages from local programs to the network.
+// NewServer initilizes part of the Overlay Server.
 func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
+	// The server does not have a key when it starts. The relationship with pool
+	// is setup so that pool should send a message telling it how to load a key
+	// before any network communication starts.
 	s := &Server{
+		nodes:       newNodes(),
 		packeter:    packeter.New(),
 		ipc:         proc,
-		nByID:       make(map[string]*node),
-		nByAddr:     make(map[string]*node),
 		loss:        0.01,
 		reliability: 0.999,
 		services:    newportmap(),
@@ -172,31 +168,6 @@ func (s *Server) SetupNetwork() {
 	s.addr = addr
 
 	log.Info(log.Lbl("IPC>"), s.ipc.Port().On("127.0.0.1"), log.Lbl("Net>"), addr, s.key.Pub())
-}
-
-func (s *Server) nodeByAddr(addr *rnet.Addr) (*node, bool) {
-	s.nodesMux.RLock()
-	n, ok := s.nByAddr[addr.String()]
-	s.nodesMux.RUnlock()
-	return n, ok
-}
-
-func (s *Server) nodeByID(id *crypto.ID) (*node, bool) {
-	s.nodesMux.RLock()
-	n, ok := s.nByID[id.String()]
-	s.nodesMux.RUnlock()
-	return n, ok
-}
-
-func (s *Server) addNode(n *node) *Server {
-	id := n.Pub.ID().String()
-	s.nodesMux.Lock()
-	s.nByID[id] = n
-	if n.FromAddr != nil {
-		s.nByAddr[n.FromAddr.String()] = n
-	}
-	s.nodesMux.Unlock()
-	return s
 }
 
 // Close stop all processes for the overlay server
