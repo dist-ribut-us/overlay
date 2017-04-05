@@ -1,0 +1,16 @@
+{
+  "Package": "overlay",
+  "Imports":[
+    "github.com/dist-ribut-us/rnet",
+    "github.com/dist-ribut-us/crypto"
+  ],
+  "TSMaps": [{
+    "Key":"uint32",
+    "Val":"rnet.Port",
+    "Name": "portmap"
+  },{
+    "Key":"string",
+    "Val":"*crypto.XchgPair",
+    "Name": "xchgPairs"
+  }]
+}

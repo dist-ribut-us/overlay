@@ -47,15 +47,11 @@ func (s *Server) handleNetMessage(msg *packeter.Package) {
 	}
 
 	var port rnet.Port
-	s.callbackMux.RLock()
-	originPort, ok := s.callbacks[h.Id]
-	s.callbackMux.RUnlock()
+	originPort, ok := s.callbacks.get(h.Id)
 	if ok {
 		port = originPort
 	} else {
-		s.servicesMux.RLock()
-		servicePort, ok := s.services[h.Service]
-		s.servicesMux.RUnlock()
+		servicePort, ok := s.services.get(h.Service)
 		if ok {
 			port = servicePort
 		} else {
@@ -165,9 +161,7 @@ func (s *Server) netSend(msg *message.Header, n *node, compression bool, origin 
 	}
 
 	if msg.IsQuery() {
-		s.callbackMux.Lock()
-		s.callbacks[id] = origin
-		s.callbackMux.Unlock()
+		s.callbacks.set(id, origin)
 	}
 	errs := s.net.SendAll(packets, n.ToAddr)
 	for _, err := range errs {

@@ -49,9 +49,7 @@ func (s *Server) handleHandshakeRequest(hs []byte, addr *rnet.Addr) {
 
 	id := signPub.ID()
 	// in the unlikely case that we both made the request at the same time
-	s.cacheMux.RLock()
-	keypair := s.xchgCache[id.String()]
-	s.cacheMux.RUnlock()
+	keypair, _ := s.xchgCache.get(id.String())
 	if keypair == nil {
 		keypair = crypto.GenerateXchgPair()
 	}
@@ -93,9 +91,7 @@ func (s *Server) handleHandshakeResponse(hs []byte, addr *rnet.Addr) {
 	log.Info(log.Lbl("handshake_response_success"), addr)
 	id := signPub.ID()
 	idStr := id.String()
-	s.cacheMux.RLock()
-	keypair, ok := s.xchgCache[idStr]
-	s.cacheMux.RUnlock()
+	keypair, ok := s.xchgCache.get(idStr)
 	if !ok {
 		log.Info(log.Lbl("handshake_response_from_unrequested"), addr)
 	}
@@ -129,14 +125,12 @@ func (s *Server) sendHandshakeRequest(n *node, callback func()) error {
 	id := n.id()
 	idStr := id.String()
 
-	s.cacheMux.Lock()
-	keypair, ok := s.xchgCache[idStr]
+	keypair, ok := s.xchgCache.get(idStr)
 	if !ok {
 		keypair = crypto.GenerateXchgPair()
-		s.xchgCache[idStr] = keypair
+		s.xchgCache.set(idStr, keypair)
 		go s.removeXchgPair(idStr)
 	}
-	s.cacheMux.Unlock()
 
 	hs := buildHandshake(handshakeRequest, keypair.Pub(), s.key)
 	n.hsCallback = callback
@@ -150,9 +144,7 @@ var removeKeyDelay = time.Second * 2
 
 func (s *Server) removeXchgPair(id string) {
 	time.Sleep(removeKeyDelay)
-	s.cacheMux.Lock()
-	delete(s.xchgCache, id)
-	s.cacheMux.Unlock()
+	s.xchgCache.delete(id)
 }
 
 func (s *Server) handleSessionDataQuery(q *ipc.Base) {

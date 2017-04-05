@@ -25,13 +25,10 @@ type Server struct {
 	loss        float64
 	reliability float64
 	addr        *rnet.Addr
-	services    map[uint32]rnet.Port
-	servicesMux sync.RWMutex
-	callbacks   map[uint32]rnet.Port
-	callbackMux sync.RWMutex
+	services    *portmap
+	callbacks   *portmap
 	forest      *merkle.Forest
-	xchgCache   map[string]*crypto.XchgPair
-	cacheMux    sync.RWMutex
+	xchgCache   *xchgPairs
 	NodeTTL     uint32 // default TTL in seconds
 }
 
@@ -46,11 +43,12 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		nByAddr:     make(map[string]*node),
 		loss:        0.01,
 		reliability: 0.999,
-		services:    map[uint32]rnet.Port{serviceID: proc.Port()},
-		callbacks:   make(map[uint32]rnet.Port),
-		xchgCache:   make(map[string]*crypto.XchgPair),
+		services:    newportmap(),
+		callbacks:   newportmap(),
+		xchgCache:   newxchgPairs(),
 		NodeTTL:     60 * 60, // one hour
 	}
+	s.services.set(serviceID, proc.Port())
 	s.packeter.Handler = s.handleNetMessage
 	s.ipc.Handler(s.handleIPCMessage)
 	var err error
@@ -83,8 +81,8 @@ func (s *Server) RandomKey() {
 }
 
 var configBkt = []byte("config")
-var keykey = []byte("key_______")
-var statickey = []byte("statickey_")
+var keykey = []byte("key")
+var statickey = []byte("statickey")
 
 // ErrNoForest is returned when attempting to perform Overlay operations that
 // require a storage forest before one is initilized

@@ -49,6 +49,10 @@ func (s *Server) handleOther(b *ipc.Base) {
 		s.handleAddBeacon(b)
 	case message.Die:
 		os.Exit(0)
+	case message.StaticKey:
+		s.LoadKey()
+	case message.RandomKey:
+		s.RandomKey()
 	default:
 		log.Info(log.Lbl("unknown_type"), t)
 	}
@@ -57,7 +61,5 @@ func (s *Server) handleOther(b *ipc.Base) {
 func (s *Server) handleRegisterService(b *ipc.Base) {
 	id := b.BodyToUint32()
 	log.Info(log.Lbl("registered_service"), id, b.Port())
-	s.servicesMux.Lock()
-	s.services[id] = b.Port()
-	s.servicesMux.Unlock()
+	s.services.set(id, b.Port())
 }
