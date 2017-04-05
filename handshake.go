@@ -56,7 +56,7 @@ func (s *Server) handleHandshakeRequest(hs []byte, addr *rnet.Addr) {
 		keypair = crypto.GenerateXchgPair()
 	}
 
-	if node, ok := s.NodeByAddr(addr); ok {
+	if node, ok := s.nodeByAddr(addr); ok {
 		if node.Pub != nil && *node.Pub != *signPub {
 			log.Error(ErrBadSignPub)
 			return
@@ -99,7 +99,7 @@ func (s *Server) handleHandshakeResponse(hs []byte, addr *rnet.Addr) {
 	if !ok {
 		log.Info(log.Lbl("handshake_response_from_unrequested"), addr)
 	}
-	node, ok := s.NodeByID(id)
+	node, ok := s.nodeByID(id)
 	if !ok {
 		log.Info(log.Lbl("handshake_response_from_unknown"), addr)
 	}
@@ -153,4 +153,23 @@ func (s *Server) removeXchgPair(id string) {
 	s.cacheMux.Lock()
 	delete(s.xchgCache, id)
 	s.cacheMux.Unlock()
+}
+
+func (s *Server) handleSessionDataQuery(q *ipc.Base) {
+	nodeID, err := crypto.IDFromSlice(q.NodeID)
+	if log.Error(err) {
+		return
+	}
+	node, ok := s.nodeByID(nodeID)
+	if !ok {
+		return
+	}
+	ttl := q.BodyToUint32()
+	if ttl > s.NodeTTL {
+		ttl = s.NodeTTL
+	}
+	node.TTL = time.Duration(ttl) * time.Second
+	node.liveTil = time.Now().Add(node.TTL)
+
+	q.Respond(s.NodeTTL)
 }

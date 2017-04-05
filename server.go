@@ -19,7 +19,7 @@ type Server struct {
 	ipc         *ipc.Proc
 	nByID       map[string]*Node
 	nByAddr     map[string]*Node
-	beacons     []*beacon
+	beacons     []*Node
 	nodesMux    sync.RWMutex
 	loss        float64
 	reliability float64
@@ -83,19 +83,17 @@ func (s *Server) SetupNetwork() {
 	log.Error(addr.Err)
 	s.addr = addr
 
-	log.Info(log.Lbl("IPC>"), s.ipc.Port().On("127.0.0.1"), log.Lbl("Net>"), addr, s.PubStr())
+	log.Info(log.Lbl("IPC>"), s.ipc.Port().On("127.0.0.1"), log.Lbl("Net>"), addr, s.key.Pub())
 }
 
-// NodeByAddr gets a node using an address
-func (s *Server) NodeByAddr(addr *rnet.Addr) (*Node, bool) {
+func (s *Server) nodeByAddr(addr *rnet.Addr) (*Node, bool) {
 	s.nodesMux.RLock()
 	node, ok := s.nByAddr[addr.String()]
 	s.nodesMux.RUnlock()
 	return node, ok
 }
 
-// NodeByID gets a node using a crypto.ID
-func (s *Server) NodeByID(id *crypto.ID) (*Node, bool) {
+func (s *Server) nodeByID(id *crypto.ID) (*Node, bool) {
 	s.nodesMux.RLock()
 	node, ok := s.nByID[id.String()]
 	s.nodesMux.RUnlock()
@@ -113,20 +111,6 @@ func (s *Server) AddNode(node *Node) *Server {
 	s.nodesMux.Unlock()
 	return s
 }
-
-// PubStr get the public key as as string
-func (s *Server) PubStr() string {
-	if s.key == nil {
-		return ""
-	}
-	return s.key.Pub().String()
-}
-
-// NetPort gets the network facing port
-func (s *Server) NetPort() rnet.Port { return s.net.Port() }
-
-// IPCPort gets the port used to communicate with other processes
-func (s *Server) IPCPort() rnet.Port { return s.ipc.Port() }
 
 // Close stop all processes for the overlay server
 func (s *Server) Close() {

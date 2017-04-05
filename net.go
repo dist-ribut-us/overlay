@@ -21,7 +21,7 @@ const (
 )
 
 func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
-	node, ok := s.NodeByAddr(addr)
+	node, ok := s.nodeByAddr(addr)
 	if !ok {
 		log.Info(log.Lbl("unknown_node"), addr)
 		return
@@ -91,7 +91,7 @@ func (s *Server) unmarshalNetMessage(msg *packeter.Package) (*message.Header, er
 		return nil, err
 	}
 	h.SetFlag(message.FromNet)
-	node, ok := s.NodeByAddr(msg.Addr)
+	node, ok := s.nodeByAddr(msg.Addr)
 	if !ok {
 		return nil, ErrUnknonNode
 	}
@@ -114,14 +114,13 @@ var gzTag = []byte{GZipped}
 // 0 - this is probably a sign that something isn't correctly setting the ID
 const ErrMsgIDZero = errors.String("Message ID cannot be 0")
 
-// NetSend sends a message over the network
-func (s *Server) NetSend(msg *message.Header, node *Node, compression bool, origin rnet.Port) {
+func (s *Server) netSend(msg *message.Header, node *Node, compression bool, origin rnet.Port) {
 	s.AddNode(node)
 	if node.Shared == nil || !node.Live() {
 		log.Info(log.Lbl("delay_net_send_for_handshake"), node.Shared == nil, !node.Live(), node.liveTil)
 		s.sendHandshakeRequest(node, func() {
 			log.Info(log.Lbl("handshake_complete:resuming"))
-			s.NetSend(msg, node, compression, origin)
+			s.netSend(msg, node, compression, origin)
 		})
 		return
 	}

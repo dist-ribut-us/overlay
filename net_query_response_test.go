@@ -39,7 +39,7 @@ func TestQueryResponse(t *testing.T) {
 	// serviceA is going to make a request from serviceB, in order for overlayB
 	// to know how to route the message, serviceB needs to register with overlayB.
 	// RegisterWithOverlay is a helper method to do this.
-	serviceB.RegisterWithOverlay(serviceBID, overlaySrvB.IPCPort())
+	serviceB.RegisterWithOverlay(serviceBID, overlaySrvB.ipc.Port())
 
 	// overlayA needs to know about nodeB before it can send the handshake
 	nodeB := &Node{
@@ -59,7 +59,7 @@ func TestQueryResponse(t *testing.T) {
 	// Send the query from A to B
 	serviceA.
 		Query(message.Test, []byte("query_from_A")).
-		ToNet(overlaySrvA.IPCPort(), nodeB.ToAddr, serviceBID).
+		ToNet(overlaySrvA.ipc.Port(), nodeB.ToAddr, serviceBID).
 		Send(func(r *ipc.Base) {
 			assert.Equal(t, message.Test, r.GetType())
 			assert.True(t, r.IsResponse())
@@ -83,7 +83,7 @@ func TestQueryResponse(t *testing.T) {
 	}
 
 	// check that both TTL values were set after the handshake
-	b, ok := overlaySrvA.NodeByID(overlaySrvB.key.Pub().ID())
+	b, ok := overlaySrvA.nodeByID(overlaySrvB.key.Pub().ID())
 	assert.True(t, ok)
 	var i int
 	for i, ok = 0, b.TTL > 0; !ok && i < 10; i, ok = i+1, b.TTL > 0 {
@@ -92,7 +92,7 @@ func TestQueryResponse(t *testing.T) {
 	}
 	assert.True(t, ok)
 
-	a, ok := overlaySrvB.NodeByID(overlaySrvA.key.Pub().ID())
+	a, ok := overlaySrvB.nodeByID(overlaySrvA.key.Pub().ID())
 	assert.True(t, ok)
 	assert.True(t, a.TTL > 0)
 }
