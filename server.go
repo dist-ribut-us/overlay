@@ -3,9 +3,10 @@ package overlay
 import (
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/errors"
-	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/merkle"
+	"github.com/dist-ribut-us/message"
 	"github.com/dist-ribut-us/natt/igdp"
 	"github.com/dist-ribut-us/packeter"
 	"github.com/dist-ribut-us/rnet"
@@ -17,7 +18,7 @@ type Server struct {
 	net         *rnet.Server
 	key         *crypto.SignPriv
 	packeter    *packeter.Packeter
-	ipc         *ipc.Proc
+	router      *ipcrouter.Router
 	loss        float64
 	reliability float64
 	addr        *rnet.Addr
@@ -29,14 +30,14 @@ type Server struct {
 }
 
 // NewServer initilizes part of the Overlay Server.
-func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
+func NewServer(router *ipcrouter.Router, netPort rnet.Port) (*Server, error) {
 	// The server does not have a key when it starts. The relationship with pool
 	// is setup so that pool should send a message telling it how to load a key
 	// before any network communication starts.
 	s := &Server{
 		nodes:       newNodes(),
 		packeter:    packeter.New(),
-		ipc:         proc,
+		router:      router,
 		loss:        0.01,
 		reliability: 0.999,
 		services:    newportmap(),
@@ -44,9 +45,10 @@ func NewServer(proc *ipc.Proc, netPort rnet.Port) (*Server, error) {
 		xchgCache:   newxchgPairs(),
 		NodeTTL:     60 * 60, // one hour
 	}
-	s.services.set(serviceID, proc.Port())
+	s.services.set(message.OverlayService, router.Port())
 	s.packeter.Handler = s.handleNetMessage
-	s.ipc.Handler(s.handleIPCMessage)
+	s.router.Register(message.OverlayService, s.handleIPCMessage)
+	s.router.NetHandler = s.handleToNet
 	var err error
 	s.net, err = rnet.New(netPort, s)
 	return s, err
@@ -144,7 +146,7 @@ func (s *Server) LoadKey() error {
 // Run the overlay server
 func (s *Server) Run() {
 	go s.net.Run()
-	s.ipc.Run()
+	s.router.Run()
 }
 
 // Forest opens the merkle forest for the overlay server.
@@ -167,12 +169,12 @@ func (s *Server) SetupNetwork() {
 	log.Error(addr.Err)
 	s.addr = addr
 
-	log.Info(log.Lbl("IPC>"), s.ipc.Port().On("127.0.0.1"), log.Lbl("Net>"), addr, s.key.Pub())
+	log.Info(log.Lbl("IPC>"), s.router.Port().On("127.0.0.1"), log.Lbl("Net>"), addr, s.key.Pub())
 }
 
 // Close stop all processes for the overlay server
 func (s *Server) Close() {
 	log.Info("closing_overlay_server")
 	s.net.Close()
-	s.ipc.Close()
+	s.router.Close()
 }

@@ -18,3 +18,5 @@ service could fill out the information and Overlay could pull that out and
 do AddNode automatically.
 
 I might be setting TTL twice when receiving a SessionData query.
+
+I could stack Headers like Russian nesting dolls to do a ToNet send...

@@ -3,7 +3,7 @@ package overlay
 import (
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/errors"
-	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
 	"github.com/dist-ribut-us/rnet"
@@ -103,10 +103,10 @@ func (s *Server) handleHandshakeResponse(hs []byte, addr *rnet.Addr) {
 
 	n.liveTil = time.Now().Add(time.Duration(s.NodeTTL) * time.Second)
 
-	s.ipc.
+	s.router.
 		Query(message.SessionData, s.NodeTTL).
-		ToNet(s.ipc.Port(), n.ToAddr, serviceID).
-		Send(func(r *ipc.Base) {
+		ToNet(s.router.Port(), n.ToAddr, message.OverlayService).
+		Send(func(r *ipcrouter.Base) {
 			ttl := r.BodyToUint32()
 			if ttl > s.NodeTTL {
 				ttl = s.NodeTTL
@@ -147,7 +147,7 @@ func (s *Server) removeXchgPair(id string) {
 	s.xchgCache.delete(id)
 }
 
-func (s *Server) handleSessionDataQuery(q *ipc.Base) {
+func (s *Server) handleSessionDataQuery(q *ipcrouter.Base) {
 	nodeID, err := crypto.IDFromSlice(q.NodeID)
 	if log.Error(err) {
 		return

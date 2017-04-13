@@ -1,32 +1,32 @@
 package overlay
 
 import (
-	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
 	"os"
 )
 
-const serviceID uint32 = 4200394536
-
 // handleIPCMessage responds to a message received over ipc
-func (s *Server) handleIPCMessage(b *ipc.Base) {
-	if b.IsToNet() {
-		b.UnsetFlag(message.ToNet)
-		n, ok := s.nByAddr[b.GetAddr().String()]
-		if !ok {
-			log.Info(log.Lbl("unknown_node"), b.GetAddr().String())
-			return
-		}
-		s.netSend(b.Header, n, true, b.Port())
-	} else if b.IsQuery() {
+func (s *Server) handleIPCMessage(b *ipcrouter.Base) {
+	if b.IsQuery() {
 		s.handleQuery(b)
 	} else {
 		s.handleOther(b)
 	}
 }
 
-func (s *Server) handleQuery(q *ipc.Base) {
+func (s *Server) handleToNet(b *ipcrouter.Base) {
+	b.UnsetFlag(message.ToNet)
+	n, ok := s.nByAddr[b.GetAddr().String()]
+	if !ok {
+		log.Info(log.Lbl("send_to_unknown_node"), b.GetAddr().String(), b.GetType32(), s.router.Port())
+		return
+	}
+	s.netSend(b.Header, n, true, b.Port())
+}
+
+func (s *Server) handleQuery(q *ipcrouter.Base) {
 	switch t := q.GetType(); t {
 	case message.Ping:
 		q.Respond([]byte{q.Body[0] + 1})
@@ -41,7 +41,7 @@ func (s *Server) handleQuery(q *ipc.Base) {
 	}
 }
 
-func (s *Server) handleOther(b *ipc.Base) {
+func (s *Server) handleOther(b *ipcrouter.Base) {
 	switch t := b.GetType(); t {
 	case message.RegisterService:
 		s.handleRegisterService(b)
@@ -58,7 +58,7 @@ func (s *Server) handleOther(b *ipc.Base) {
 	}
 }
 
-func (s *Server) handleRegisterService(b *ipc.Base) {
+func (s *Server) handleRegisterService(b *ipcrouter.Base) {
 	id := b.BodyToUint32()
 	log.Info(log.Lbl("registered_service"), id, b.Port())
 	s.services.set(id, b.Port())

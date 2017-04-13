@@ -2,14 +2,14 @@ package overlay
 
 import (
 	"github.com/dist-ribut-us/crypto"
-	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
 )
 
 var beaconBkt = []byte("beacon")
 
-func (s *Server) handleAddBeacon(b *ipc.Base) {
+func (s *Server) handleAddBeacon(b *ipcrouter.Base) {
 	addr := b.GetAddr()
 	if addr == nil {
 		log.Info(log.Lbl("cannot_add_beacon_addr_is_nil"))

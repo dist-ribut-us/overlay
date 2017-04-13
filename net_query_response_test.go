@@ -2,7 +2,8 @@ package overlay
 
 import (
 	"github.com/dist-ribut-us/crypto"
-	"github.com/dist-ribut-us/ipc"
+	"github.com/dist-ribut-us/ipcrouter"
+	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -17,10 +18,11 @@ func TestQueryResponse(t *testing.T) {
 	var serviceBID uint32 = 31415926
 
 	// setup service and overlay for A
-	serviceA, err := ipc.RunNew(getPort())
+	serviceA, err := ipcrouter.New(getPort())
 	assert.NoError(t, err)
+	go serviceA.Run()
 	defer serviceA.Close()
-	overlayProcA, err := ipc.New(getPort())
+	overlayProcA, err := ipcrouter.New(getPort())
 	assert.NoError(t, err)
 	overlaySrvA, err := NewServer(overlayProcA, getPort())
 	assert.NoError(t, err)
@@ -30,10 +32,11 @@ func TestQueryResponse(t *testing.T) {
 	defer overlaySrvA.Close()
 
 	// setup service and overlay for B
-	serviceB, err := ipc.RunNew(getPort())
+	serviceB, err := ipcrouter.New(getPort())
 	assert.NoError(t, err)
+	go serviceB.Run()
 	defer serviceB.Close()
-	overlayProcB, err := ipc.New(getPort())
+	overlayProcB, err := ipcrouter.New(getPort())
 	assert.NoError(t, err)
 	overlaySrvB, err := NewServer(overlayProcB, getPort())
 	assert.NoError(t, err)
@@ -42,10 +45,13 @@ func TestQueryResponse(t *testing.T) {
 	go overlaySrvB.Run()
 	defer overlaySrvB.Close()
 
+	log.Info(serviceA.Port(), overlayProcA.Port(), overlaySrvA.net.Port())
+	log.Info(serviceB.Port(), overlayProcB.Port(), overlaySrvB.net.Port())
+
 	// serviceA is going to make a request from serviceB, in order for overlayB
 	// to know how to route the message, serviceB needs to register with overlayB.
 	// RegisterWithOverlay is a helper method to do this.
-	serviceB.RegisterWithOverlay(serviceBID, overlaySrvB.ipc.Port())
+	serviceB.RegisterWithOverlay(serviceBID, overlaySrvB.router.Port())
 
 	// overlayA needs to know about nodeB before it can send the handshake
 	nodeB := &node{
@@ -57,7 +63,7 @@ func TestQueryResponse(t *testing.T) {
 
 	// Before sending the request from A, setup the handler in B
 	out := make(chan string)
-	serviceB.Handler(func(msg *ipc.Base) {
+	serviceB.Register(serviceBID, func(msg *ipcrouter.Base) {
 		out <- msg.BodyString() + ":to_B"
 		msg.Respond("resp_from_B")
 	})
@@ -65,8 +71,8 @@ func TestQueryResponse(t *testing.T) {
 	// Send the query from A to B
 	serviceA.
 		Query(message.Test, []byte("query_from_A")).
-		ToNet(overlaySrvA.ipc.Port(), nodeB.ToAddr, serviceBID).
-		Send(func(r *ipc.Base) {
+		ToNet(overlaySrvA.router.Port(), nodeB.ToAddr, serviceBID).
+		Send(func(r *ipcrouter.Base) {
 			assert.Equal(t, message.Test, r.GetType())
 			assert.True(t, r.IsResponse())
 			out <- string(r.Body) + ":to_A"

@@ -1,9 +1,9 @@
 package overlay
 
 import (
-  "sync"
-  "github.com/dist-ribut-us/rnet"
   "github.com/dist-ribut-us/crypto"
+  "github.com/dist-ribut-us/rnet"
+  "sync"
 )
 
 type portmap struct {
