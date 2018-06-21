@@ -4,6 +4,7 @@ import (
 	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
+	"github.com/dist-ribut-us/overlay/overlaymessages"
 	"os"
 )
 
@@ -36,6 +37,13 @@ func (s *Server) handleQuery(q *ipcrouter.Base) {
 		q.Respond(uint32(s.net.Port()))
 	case message.SessionData:
 		s.handleSessionDataQuery(q)
+	case overlaymessages.GetID:
+		q.Respond(
+			(&overlaymessages.ID{
+				Sign:  s.key.Pub(),
+				Xchng: s.keyX.Pub(),
+			}).Serialize(),
+		)
 	default:
 		log.Info(log.Lbl("unknown_query_type"), t)
 	}

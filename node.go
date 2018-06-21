@@ -9,6 +9,7 @@ import (
 
 type node struct {
 	Pub        *crypto.SignPub
+	PubX       *crypto.XchgPub // Temporary until github.com/golang/go/issues/20504
 	cachedID   *crypto.ID
 	Shared     *crypto.Symmetric
 	ToAddr     *rnet.Addr

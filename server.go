@@ -6,8 +6,8 @@ import (
 	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/merkle"
-	"github.com/dist-ribut-us/message"
 	"github.com/dist-ribut-us/natt/igdp"
+	"github.com/dist-ribut-us/overlay/overlaymessages"
 	"github.com/dist-ribut-us/packeter"
 	"github.com/dist-ribut-us/rnet"
 )
@@ -17,6 +17,7 @@ type Server struct {
 	*nodes
 	net         *rnet.Server
 	key         *crypto.SignPriv
+	keyX        *crypto.XchgPair // Temporary until github.com/golang/go/issues/20504
 	packeter    *packeter.Packeter
 	router      *ipcrouter.Router
 	loss        float64
@@ -45,9 +46,9 @@ func NewServer(router *ipcrouter.Router, netPort rnet.Port) (*Server, error) {
 		xchgCache:   newxchgPairs(),
 		NodeTTL:     60 * 60, // one hour
 	}
-	s.services.set(message.OverlayService, router.Port())
+	s.services.set(overlaymessages.ServiceID, router.Port())
 	s.packeter.Handler = s.handleNetMessage
-	s.router.Register(message.OverlayService, s.handleIPCMessage)
+	s.router.Register(overlaymessages.ServiceID, s.handleIPCMessage)
 	s.router.NetHandler = s.handleToNet
 	var err error
 	s.net, err = rnet.New(netPort, s)
@@ -76,11 +77,15 @@ func (s *Server) SetKey() error {
 // RandomKey sets the servers signing key to a random key value
 func (s *Server) RandomKey() {
 	_, s.key = crypto.GenerateSignPair()
+	s.keyX = crypto.GenerateXchgPair()
 }
 
-var configBkt = []byte("config")
-var keykey = []byte("key")
-var statickey = []byte("statickey")
+var (
+	configBkt = []byte("config")
+	keykey    = []byte("key")
+	keyXkey   = []byte("keyX")
+	statickey = []byte("statickey")
+)
 
 // ErrNoForest is returned when attempting to perform Overlay operations that
 // require a storage forest before one is initilized
@@ -107,6 +112,7 @@ func (s *Server) SetStaticKey(val bool) error {
 		s.RandomKey()
 	}
 	return s.forest.SetValue(configBkt, keykey, s.key.Slice())
+	return s.forest.SetValue(configBkt, keyXkey, s.keyX.Slice())
 }
 
 // GetStaticKey returns the current config value of statickey
@@ -130,16 +136,23 @@ func (s *Server) LoadKey() error {
 	if s.forest == nil {
 		return ErrNoForest
 	}
-	val, err := s.forest.GetValue(configBkt, keykey)
+	keyB, err := s.forest.GetValue(configBkt, keykey)
+	if err != nil {
+		return err
+	}
+	keyXB, err := s.forest.GetValue(configBkt, keyXkey)
 	if err != nil {
 		return err
 	}
 
-	if val == nil {
-		_, s.key = crypto.GenerateSignPair()
-		return s.forest.SetValue(configBkt, keykey, s.key.Slice())
+	if keyB == nil || keyXB == nil {
+		s.SetStaticKey(true)
+		return nil
 	}
-	s.key = crypto.SignPrivFromSlice(val)
+
+	s.key = crypto.SignPrivFromSlice(keyB)
+	s.keyX = crypto.XchgPairFromSlice(keyXB)
+
 	return nil
 }
 

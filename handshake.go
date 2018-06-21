@@ -6,6 +6,7 @@ import (
 	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
+	"github.com/dist-ribut-us/overlay/overlaymessages"
 	"github.com/dist-ribut-us/rnet"
 	"time"
 )
@@ -105,7 +106,7 @@ func (s *Server) handleHandshakeResponse(hs []byte, addr *rnet.Addr) {
 
 	s.router.
 		Query(message.SessionData, s.NodeTTL).
-		ToNet(s.router.Port(), n.ToAddr, message.OverlayService).
+		ToNet(s.router.Port(), n.ToAddr, overlaymessages.ServiceID).
 		Send(func(r *ipcrouter.Base) {
 			ttl := r.BodyToUint32()
 			if ttl > s.NodeTTL {
