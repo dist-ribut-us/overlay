@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"github.com/dist-ribut-us/bufpool"
 	"github.com/dist-ribut-us/errors"
+	"github.com/dist-ribut-us/ipcrouter"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
 	"github.com/dist-ribut-us/packeter"
@@ -19,6 +20,24 @@ const (
 	NoCompression = byte(iota)
 	GZipped
 )
+
+// NetSend service via Overlay
+func (s *Server) NetSend(msg ipcrouter.NetSendRequest) {
+	n, ok := s.nByAddr[msg.GetAddr().String()]
+	if !ok {
+		log.Info(log.Lbl("send_to_unknown_node"), msg.GetAddr().String(), msg.GetType32(), msg.GetRouterPort())
+		return
+	}
+	s.netSend(msg.GetHeader(), n, true, msg.Port())
+}
+
+// NetQueryHandler for Overlay service
+func (s *Server) NetQueryHandler(q ipcrouter.NetQuery) {
+	switch t := q.GetType(); t {
+	case message.SessionData:
+		s.handleSessionDataQuery(q)
+	}
+}
 
 func (s *Server) message(cPkt []byte, addr *rnet.Addr) {
 	n, ok := s.nodeByAddr(addr)

@@ -9,12 +9,21 @@ import (
 	"testing"
 )
 
-var portInc uint16 = 5555
-
-func getPort() rnet.Port {
-	portInc++
-	return rnet.Port(portInc)
+func init() {
+	log.Mute()
 }
+
+func unmute() {
+	log.ToStdOut()
+	log.SetDebug(true)
+	log.SetTrace(1, 1, 0)
+}
+
+func mute() {
+	log.Mute()
+}
+
+var getPort = rnet.NewPortIncrementer(5555)
 
 const loremIpsum = `Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 Nullam eu interdum nibh, vel malesuada nunc. Morbi sit amet augue finibus magna
@@ -35,19 +44,6 @@ func (s *Server) setIP(t *testing.T, ip string) {
 		t.Error(addr.Err)
 	}
 	s.addr = addr
-}
-
-func init() {
-	log.Mute()
-}
-
-func unmute() {
-	log.ToStdOut()
-	log.SetDebug(true)
-}
-
-func mute() {
-	log.Mute()
 }
 
 func TestCompress(t *testing.T) {

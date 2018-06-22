@@ -9,13 +9,13 @@ import (
 
 var beaconBkt = []byte("beacon")
 
-func (s *Server) handleAddBeacon(b *ipcrouter.Base) {
-	addr := b.GetAddr()
+func (s *Server) handleAddBeacon(c ipcrouter.Command) {
+	addr := c.GetAddr()
 	if addr == nil {
 		log.Info(log.Lbl("cannot_add_beacon_addr_is_nil"))
 		return
 	}
-	pub := crypto.SignPubFromSlice(b.Body)
+	pub := crypto.SignPubFromSlice(c.GetBody())
 	s.addBeacon(pub, addr)
 }
 

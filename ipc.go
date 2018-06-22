@@ -8,35 +8,15 @@ import (
 	"os"
 )
 
-// handleIPCMessage responds to a message received over ipc
-func (s *Server) handleIPCMessage(b *ipcrouter.Base) {
-	if b.IsQuery() {
-		s.handleQuery(b)
-	} else {
-		s.handleOther(b)
-	}
-}
-
-func (s *Server) handleToNet(b *ipcrouter.Base) {
-	b.UnsetFlag(message.ToNet)
-	n, ok := s.nByAddr[b.GetAddr().String()]
-	if !ok {
-		log.Info(log.Lbl("send_to_unknown_node"), b.GetAddr().String(), b.GetType32(), s.router.Port())
-		return
-	}
-	s.netSend(b.Header, n, true, b.Port())
-}
-
-func (s *Server) handleQuery(q *ipcrouter.Base) {
+// QueryHandler for ipc queries to Overlay service
+func (s *Server) QueryHandler(q ipcrouter.Query) {
 	switch t := q.GetType(); t {
 	case message.Ping:
-		q.Respond([]byte{q.Body[0] + 1})
+		q.Respond([]byte{q.GetBody()[0] + 1})
 	case message.GetPubKey:
 		q.Respond(s.key.Pub().Slice())
 	case message.GetPort:
 		q.Respond(uint32(s.net.Port()))
-	case message.SessionData:
-		s.handleSessionDataQuery(q)
 	case overlaymessages.GetID:
 		q.Respond(
 			(&overlaymessages.ID{
@@ -49,12 +29,13 @@ func (s *Server) handleQuery(q *ipcrouter.Base) {
 	}
 }
 
-func (s *Server) handleOther(b *ipcrouter.Base) {
-	switch t := b.GetType(); t {
+// CommandHandler for ipc commands to Overlay service
+func (s *Server) CommandHandler(c ipcrouter.Command) {
+	switch t := c.GetType(); t {
 	case message.RegisterService:
-		s.handleRegisterService(b)
+		s.handleRegisterService(c)
 	case message.AddBeacon:
-		s.handleAddBeacon(b)
+		s.handleAddBeacon(c)
 	case message.Die:
 		os.Exit(0)
 	case message.StaticKey:
@@ -66,8 +47,8 @@ func (s *Server) handleOther(b *ipcrouter.Base) {
 	}
 }
 
-func (s *Server) handleRegisterService(b *ipcrouter.Base) {
-	id := b.BodyToUint32()
-	log.Info(log.Lbl("registered_service"), id, b.Port())
-	s.services.set(id, b.Port())
+func (s *Server) handleRegisterService(c ipcrouter.Command) {
+	id := c.BodyToUint32()
+	log.Info(log.Lbl("registered_service"), id, c.Port())
+	s.services.set(id, c.Port())
 }

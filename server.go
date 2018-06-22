@@ -48,11 +48,15 @@ func NewServer(router *ipcrouter.Router, netPort rnet.Port) (*Server, error) {
 	}
 	s.services.set(overlaymessages.ServiceID, router.Port())
 	s.packeter.Handler = s.handleNetMessage
-	s.router.Register(overlaymessages.ServiceID, s.handleIPCMessage)
-	s.router.NetHandler = s.handleToNet
+	s.router.Register(s)
 	var err error
 	s.net, err = rnet.New(netPort, s)
 	return s, err
+}
+
+// ServiceID for Overlay service
+func (*Server) ServiceID() uint32 {
+	return overlaymessages.ServiceID
 }
 
 // SetKey will set the key on the server. If a forest has been initilized, it
@@ -78,6 +82,11 @@ func (s *Server) SetKey() error {
 func (s *Server) RandomKey() {
 	_, s.key = crypto.GenerateSignPair()
 	s.keyX = crypto.GenerateXchgPair()
+}
+
+// Port returns the ipc router port for Overlay
+func (s *Server) Port() rnet.Port {
+	return s.router.Port()
 }
 
 var (
@@ -187,7 +196,7 @@ func (s *Server) SetupNetwork() {
 
 // Close stop all processes for the overlay server
 func (s *Server) Close() {
-	log.Info("closing_overlay_server")
+	log.Info(log.Lbl("closing_overlay_server"), log.KV{"net", s.net.Port()}, log.KV{"local", s.router.Port()})
 	s.net.Close()
 	s.router.Close()
 }

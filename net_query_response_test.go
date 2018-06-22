@@ -3,6 +3,7 @@ package overlay
 import (
 	"github.com/dist-ribut-us/crypto"
 	"github.com/dist-ribut-us/ipcrouter"
+	"github.com/dist-ribut-us/ipcrouter/testservice"
 	"github.com/dist-ribut-us/log"
 	"github.com/dist-ribut-us/message"
 	"github.com/stretchr/testify/assert"
@@ -15,30 +16,30 @@ import (
 // through overlay nodes.
 func TestQueryResponse(t *testing.T) {
 	ip := "127.0.0.1"
-	var serviceBID uint32 = 31415926
 
 	// setup service and overlay for A
-	serviceA, err := ipcrouter.New(getPort())
+	serviceA, err := testservice.New(314159, getPort.Next())
 	assert.NoError(t, err)
 	go serviceA.Run()
 	defer serviceA.Close()
-	overlayProcA, err := ipcrouter.New(getPort())
+	overlayProcA, err := ipcrouter.New(getPort.Next())
 	assert.NoError(t, err)
-	overlaySrvA, err := NewServer(overlayProcA, getPort())
+	overlaySrvA, err := NewServer(overlayProcA, getPort.Next())
 	assert.NoError(t, err)
 	overlaySrvA.setIP(t, ip)
 	overlaySrvA.RandomKey()
 	go overlaySrvA.Run()
 	defer overlaySrvA.Close()
+	serviceA.NetSenderPort = overlayProcA.Port()
 
 	// setup service and overlay for B
-	serviceB, err := ipcrouter.New(getPort())
+	serviceB, err := testservice.New(265358, getPort.Next())
 	assert.NoError(t, err)
 	go serviceB.Run()
 	defer serviceB.Close()
-	overlayProcB, err := ipcrouter.New(getPort())
+	overlayProcB, err := ipcrouter.New(getPort.Next())
 	assert.NoError(t, err)
-	overlaySrvB, err := NewServer(overlayProcB, getPort())
+	overlaySrvB, err := NewServer(overlayProcB, getPort.Next())
 	assert.NoError(t, err)
 	overlaySrvB.setIP(t, ip)
 	overlaySrvB.RandomKey()
@@ -51,7 +52,7 @@ func TestQueryResponse(t *testing.T) {
 	// serviceA is going to make a request from serviceB, in order for overlayB
 	// to know how to route the message, serviceB needs to register with overlayB.
 	// RegisterWithOverlay is a helper method to do this.
-	serviceB.RegisterWithOverlay(serviceBID, overlaySrvB.router.Port())
+	serviceB.RegisterWithOverlay(serviceB.ServiceID(), overlaySrvB.router.Port())
 
 	// overlayA needs to know about nodeB before it can send the handshake
 	nodeB := &node{
@@ -61,35 +62,26 @@ func TestQueryResponse(t *testing.T) {
 	}
 	overlaySrvA.addNode(nodeB)
 
-	// Before sending the request from A, setup the handler in B
-	out := make(chan string)
-	serviceB.Register(serviceBID, func(msg *ipcrouter.Base) {
-		out <- msg.BodyString() + ":to_B"
-		msg.Respond("resp_from_B")
-	})
-
 	// Send the query from A to B
-	serviceA.
-		Query(message.Test, []byte("query_from_A")).
-		ToNet(overlaySrvA.router.Port(), nodeB.ToAddr, serviceBID).
-		Send(func(r *ipcrouter.Base) {
-			assert.Equal(t, message.Test, r.GetType())
-			assert.True(t, r.IsResponse())
-			out <- string(r.Body) + ":to_A"
-		})
+	serviceA.Router.
+		Query(message.Test, "query_from_A").
+		SetService(serviceB.ServiceID()).
+		SendToNet(nodeB.ToAddr, serviceA.NetResponder)
 
 	// check that B receives the query
 	select {
-	case s := <-out:
-		assert.Equal(t, "query_from_A:to_B", s)
+	case nq := <-serviceB.Chan.NetQuery:
+		assert.Equal(t, "query_from_A", nq.BodyString())
+		nq.Respond("resp_from_B")
 	case <-time.After(time.Millisecond * 10):
 		t.Error("time out")
 	}
 
 	// check that A recieves the response
+	// TODO: Fix this - need to wire up a NetResponse
 	select {
-	case s := <-out:
-		assert.Equal(t, "resp_from_B:to_A", s)
+	case r := <-serviceA.Chan.NetResponse:
+		assert.Equal(t, "resp_from_B", r.BodyString())
 	case <-time.After(time.Millisecond * 10):
 		t.Error("time out")
 	}

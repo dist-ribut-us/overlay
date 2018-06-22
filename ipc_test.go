@@ -9,15 +9,15 @@ import (
 )
 
 func TestGetID(t *testing.T) {
-	router, err := ipcrouter.New(getPort())
+	router, err := ipcrouter.New(getPort.Next())
 	assert.NoError(t, err)
-	s, err := NewServer(router, getPort())
+	s, err := NewServer(router, getPort.Next())
 	assert.NoError(t, err)
 	assert.NotNil(t, s)
 	s.RandomKey()
 	go s.Run()
 
-	router, err = ipcrouter.New(getPort())
+	router, err = ipcrouter.New(getPort.Next())
 	assert.NoError(t, err)
 	go router.Run()
 
@@ -26,8 +26,8 @@ func TestGetID(t *testing.T) {
 		Query(overlaymessages.GetID, nil).
 		To(s.router.Port()).
 		SetService(overlaymessages.ServiceID).
-		Send(func(msg *ipcrouter.Base) {
-			id := overlaymessages.DeserializeID(msg.Body)
+		Send(func(r ipcrouter.Response) {
+			id := overlaymessages.DeserializeID(r.GetBody())
 			assert.Equal(t, s.key.Pub().Slice(), id.Sign.Slice())
 			assert.Equal(t, s.keyX.Pub().Slice(), id.Xchng.Slice())
 			wait <- true

@@ -106,8 +106,8 @@ func (s *Server) handleHandshakeResponse(hs []byte, addr *rnet.Addr) {
 
 	s.router.
 		Query(message.SessionData, s.NodeTTL).
-		ToNet(s.router.Port(), n.ToAddr, overlaymessages.ServiceID).
-		Send(func(r *ipcrouter.Base) {
+		SetService(overlaymessages.ServiceID).
+		SendToNet(n.ToAddr, func(r ipcrouter.NetResponse) {
 			ttl := r.BodyToUint32()
 			if ttl > s.NodeTTL {
 				ttl = s.NodeTTL
@@ -148,8 +148,8 @@ func (s *Server) removeXchgPair(id string) {
 	s.xchgCache.delete(id)
 }
 
-func (s *Server) handleSessionDataQuery(q *ipcrouter.Base) {
-	nodeID, err := crypto.IDFromSlice(q.NodeID)
+func (s *Server) handleSessionDataQuery(q ipcrouter.NetQuery) {
+	nodeID, err := crypto.IDFromSlice(q.GetNodeID())
 	if log.Error(err) {
 		return
 	}
